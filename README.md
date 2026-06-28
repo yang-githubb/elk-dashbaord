@@ -131,6 +131,46 @@ No `npm install` or compilation required.
 | Empty Line / Model dropdowns | Update `fields` in `config.js` to match index mapping |
 | `config.js` missing | Run `start.bat` or `copy config.example.js config.js` |
 
+## Handling large datasets (500M+ records)
+
+**Demo mode** only loads ~200 local sample records — for development only.
+
+**Live Elasticsearch mode** is built for large scale:
+
+| What | How | Scales? |
+|------|-----|--------|
+| KPIs & pie charts | Elasticsearch **aggregations** (`size: 0`) — counts computed on cluster | Yes |
+| Board count | `cardinality` on serial field | Yes (approximate on huge sets) |
+| Records table | **25 rows per page** only — never loads full dataset | Yes |
+| Browser | Never receives 500M documents | — |
+
+### What will NOT work at 500M+
+- Loading all records into the browser
+- Client-side rollups (demo mode logic)
+- **All time** queries without filters on huge indices (slow/timeouts)
+- Deep table pagination (page 1,000,000) with `from` + `size`
+
+### Recommendations for production
+1. Set `useDemo: false` and map `fields` in `config.js` to your index
+2. Use **time filters** (24h / 7d) for routine monitoring; avoid **All time** unless indexed/summarized
+3. Ensure `serial`, `line`, `model`, `general`, `result` are **keyword** fields (or `.keyword` subfields)
+4. Prefer **board-level** documents in ES, or a rollup index — pad-level 500M docs will aggregate pad counts, not boards
+5. Use Elasticsearch **index lifecycle** (daily/weekly indices) for time pruning
+6. For very large exports, use ES `_search` / Datafeed / ETL — not this dashboard
+
+### Field mapping (`config.js`)
+
+```js
+fields: {
+  time: "@timestamp",
+  line: "line",
+  model: "model",
+  serial: "board_id",    // used for cardinality (board count)
+  general: "general",    // PASS / FAIL
+  result: "result",      // GOOD / PASS / FAIL
+}
+```
+
 ## License
 
 Internal factory use. Adjust as needed for your organization.

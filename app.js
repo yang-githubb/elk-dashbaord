@@ -136,9 +136,111 @@ function timeSelectOptions() {
   return TIME_ORDER.map((t) => ({ value: t, label: TIME_LABELS[t] || t }));
 }
 
-function buildEsQuery(filters) {
-  if (!filters.length) return { match_all: {} };
-  return { bool: { filter: filters } };
+function getFields() {
+  const defaults = {
+    time: "@timestamp",
+    line: "line",
+    model: "model",
+    serial: "board_id",
+    general: "general",
+    result: "result",
+  };
+  return { ...defaults, ...(cfg().fields ?? {}) };
+}
+
+function esField(field) {
+  return field.includes(".") ? field : `${field}.keyword`;
+}
+
+function buildEsFilters() {
+  const fields = getFields();
+  const filters = [];
+  if (!isAllTime()) {
+    filters.push({ range: { [fields.time]: { gte: ES_TIME_RANGES[state.time] } } });
+  }
+  if (state.line) filters.push({ term: { [esField(fields.line)]: state.line } });
+  if (state.model) filters.push({ term: { [esField(fields.model)]: state.model } });
+  return filters;
+}
+
+function termsToCounts(buckets, keys) {
+  const counts = Object.fromEntries(keys.map((k) => [k, 0]));
+  for (const b of buckets ?? []) {
+    const key = String(b.key).toUpperCase();
+    if (counts[key] !== undefined) counts[key] = b.doc_count;
+  }
+  return counts;
+}
+
+function buildDashboardAggs() {
+  const fields = getFields();
+  return {
+    board_count: { cardinality: { field: esField(fields.serial) } },
+    general: { terms: { field: esField(fields.general), size: 10 } },
+    result: { terms: { field: esField(fields.result), size: 10 } },
+    lines: { terms: { field: esField(fields.line), size: 200 } },
+    models: { terms: { field: esField(fields.model), size: 200 } },
+  };
+}
+
+function hitToTableRow(hit) {
+  const fields = getFields();
+  const s = hit._source ?? {};
+  const ts = s[fields.time];
+  const result = String(s[fields.result] ?? padToResult(s)).toUpperCase();
+  const general = String(s[fields.general] ?? generalFromResult(result)).toUpperCase();
+  return {
+    date: ts ? String(ts).slice(0, 10) : "—",
+    serial: s[fields.serial] ?? hit._id,
+    model: s[fields.model] ?? "—",
+    line: s[fields.line] ?? "—",
+    general,
+    result,
+    pad_count: s.pad_count ?? "—",
+    source: "elk",
+  };
+}
+
+function renderKpisFromCounts(boardCount, generalCounts, resultCounts) {
+  const pass = generalCounts.PASS ?? 0;
+  const fail = generalCounts.FAIL ?? 0;
+  const good = resultCounts.GOOD ?? 0;
+  const denom = pass + fail || boardCount;
+  const yieldPct = denom ? Math.round((pass / denom) * 100) : 0;
+
+  $("kpi-boards").textContent = boardCount.toLocaleString();
+  $("kpi-pass").textContent = pass.toLocaleString();
+  $("kpi-fail").textContent = fail.toLocaleString();
+  $("kpi-good").textContent = good.toLocaleString();
+  $("kpi-yield").textContent = denom ? `${yieldPct}%` : "—";
+}
+
+function applyEsView(aggRes, tableRows, totalHits, page) {
+  state.page = page;
+  const aggs = aggRes.aggregations ?? {};
+  const boardCount = aggs.board_count?.value ?? totalHits ?? 0;
+  const generalCounts = termsToCounts(aggs.general?.buckets, ["PASS", "FAIL"]);
+  const resultCounts = termsToCounts(aggs.result?.buckets, ["GOOD", "PASS", "FAIL"]);
+
+  if (totalHits) {
+    state.totalPages = Math.ceil(totalHits / PAGE_SIZE);
+  } else {
+    state.totalPages = page + (tableRows.length === PAGE_SIZE ? 2 : 1);
+  }
+
+  $("updated").textContent = `Updated ${formatTime(new Date().toISOString())}`;
+  renderKpisFromCounts(boardCount, generalCounts, resultCounts);
+  renderCenteredPie($("chart-general-date"), generalCounts, ["PASS", "FAIL"], { PASS: "Pass", FAIL: "Fail" });
+  renderCenteredPie($("chart-model-date"), resultCounts, ["GOOD", "PASS", "FAIL"], { GOOD: "Good", PASS: "Pass", FAIL: "Fail" });
+  renderCenteredPie($("chart-serial"), resultCounts, ["GOOD", "PASS", "FAIL"], { GOOD: "Good", PASS: "Pass", FAIL: "Fail" });
+  renderCenteredPie($("chart-line-result"), generalCounts, ["PASS", "FAIL"], { PASS: "Pass", FAIL: "Fail" });
+  renderTable(tableRows);
+  updatePager();
+  updateModeLabel(boardCount);
+
+  if (totalHits > 1_000_000) {
+    $("page-info").textContent = `Page ${page + 1} · ${totalHits.toLocaleString()} records (use filters to narrow)`;
+  }
 }
 
 function updateModeLabel(boardCount) {
@@ -443,23 +545,58 @@ function searchUrl() {
   return `${node.replace(/\/$/, "")}/${index}/_search`;
 }
 
-async function esSearch(body, signal) {
-  const res = await fetch(searchUrl(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: authHeader() },
-    body: JSON.stringify(body),
-    signal,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.reason || res.statusText);
-  return data;
+function buildEsQuery(filters) {
+  if (!filters.length) return { match_all: {} };
+  return { bool: { filter: filters } };
 }
 
-async function loadLiveFilters(signal) {
-  const { fields } = cfg();
-  state.fields = fields;
+async function esSearch(body, signal) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener("abort", onAbort);
+
+  try {
+    const res = await fetch(searchUrl(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authHeader() },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.reason || res.statusText);
+    return data;
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+async function loadLiveFilters() {
+  state.fields = getFields();
+  const filters = [];
+  if (!isAllTime()) {
+    filters.push({ range: { [state.fields.time]: { gte: ES_TIME_RANGES[state.time] } } });
+  }
+
+  const res = await esSearch({
+    size: 0,
+    query: buildEsQuery(filters),
+    aggs: {
+      lines: { terms: { field: esField(state.fields.line), size: 200, order: { _key: "asc" } } },
+      models: { terms: { field: esField(state.fields.model), size: 200, order: { _key: "asc" } } },
+    },
+  });
+
   fillSelect($("time"), timeSelectOptions(), (o) => o.label);
   $("time").value = state.time || "all";
+
+  const lines = res.aggregations?.lines?.buckets?.map((b) => String(b.key)) ?? [];
+  const models = res.aggregations?.models?.buckets?.map((b) => String(b.key)) ?? [];
+
+  fillSelect($("line"), [{ value: "", label: "All lines" }, ...lines.map((l) => ({ value: l, label: l }))]);
+  fillSelect($("model"), [{ value: "", label: "All models" }, ...models.map((m) => ({ value: m, label: m }))]);
+
   $("demo-banner").classList.add("hidden");
 }
 
@@ -467,34 +604,48 @@ async function loadLiveData(page, silent) {
   state.loading = !silent;
   hideError();
   $("refresh").disabled = true;
+
+  state.abort?.abort();
+  const controller = new AbortController();
+  state.abort = controller;
+
   try {
-    const { fields } = cfg();
-    const filters = [];
-    if (!isAllTime()) {
-      filters.push({ range: { [fields.time]: { gte: ES_TIME_RANGES[state.time] } } });
-    }
-    if (state.line) filters.push({ term: { [`${fields.line}.keyword`]: state.line } });
+    const fields = getFields();
+    state.fields = fields;
+    const filters = buildEsFilters();
+    const query = buildEsQuery(filters);
 
-    const res = await esSearch(
-      {
-        from: page * PAGE_SIZE,
-        size: PAGE_SIZE,
-        sort: [{ [fields.time]: { order: "desc" } }],
-        query: buildEsQuery(filters),
-      },
-      state.abort?.signal,
-    );
+    const [aggRes, tableRes] = await Promise.all([
+      esSearch({ size: 0, query, aggs: buildDashboardAggs() }, controller.signal),
+      esSearch(
+        {
+          from: page * PAGE_SIZE,
+          size: PAGE_SIZE,
+          track_total_hits: true,
+          sort: [{ [fields.time]: { order: "desc" } }],
+          query,
+        },
+        controller.signal,
+      ),
+    ]);
 
-    const hits = res.hits.hits.map((h) => ({ id: h._id, ...h._source }));
-    const boards = extractBoards(hits);
-    applyView(boards, page);
+    if (controller.signal.aborted) return;
+
+    const total =
+      typeof tableRes.hits.total === "number" ? tableRes.hits.total : (tableRes.hits.total?.value ?? 0);
+    const rows = tableRes.hits.hits.map(hitToTableRow);
+
+    applyEsView(aggRes, rows, total, page);
     setStatus("live");
   } catch (err) {
+    if (controller.signal.aborted) return;
     setStatus("off");
     showError(err.message || "Failed to load data");
   } finally {
-    state.loading = false;
-    $("refresh").disabled = false;
+    if (!controller.signal.aborted) {
+      state.loading = false;
+      $("refresh").disabled = false;
+    }
   }
 }
 

@@ -7,6 +7,9 @@ window.ES_CONFIG = {
   fields: {
     time: "@timestamp",
     line: "line",
-    station: "station",
+    model: "model",
+    serial: "board_id",
+    general: "general",
+    result: "result",
   },
 };
