@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SMT Board Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-title">
+      <h1>SMT Board Dashboard</h1>
+      <span id="status" class="status status-bad">Disconnected</span>
+    </div>
+
+    <div class="filters">
+      <label class="filter">
+        <span>Time</span>
+        <select id="time"></select>
+      </label>
+      <label class="filter">
+        <span>Line</span>
+        <select id="line"><option value="">All lines</option></select>
+      </label>
+      <label class="filter">
+        <span>Model</span>
+        <select id="model"><option value="">All models</option></select>
+      </label>
+      <button type="button" id="refresh" class="btn">Refresh</button>
+    </div>
+
+    <div class="meta">
+      <span id="updated">—</span>
+      <span id="mode-label">—</span>
+    </div>
+  </header>
+
+  <div id="demo-banner" class="banner banner-demo hidden">
+    Demo mode — board results from synthetic + CSV data. Set <code>useDemo: false</code> in config.js for live Elasticsearch.
+  </div>
+
+  <div id="error" class="banner banner-error hidden" role="alert">
+    <span id="error-text"></span>
+    <button type="button" id="retry" class="btn btn-inline">Retry</button>
+  </div>
+
+  <main class="main">
+    <section class="kpi-row">
+      <div class="kpi-card kpi-card-highlight">
+        <span class="kpi-label">Board count</span>
+        <span id="kpi-boards" class="kpi-value">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Pass</span>
+        <span id="kpi-pass" class="kpi-value kpi-ok">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Fail</span>
+        <span id="kpi-fail" class="kpi-value kpi-error">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Good</span>
+        <span id="kpi-good" class="kpi-value kpi-good">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Yield</span>
+        <span id="kpi-yield" class="kpi-value">—</span>
+      </div>
+    </section>
+
+    <section class="dashboard-section">
+      <h2 class="section-title">Board results</h2>
+      <div class="charts-grid">
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <h3>General pass / fail</h3>
+          </div>
+          <div id="chart-general-date" class="chart-area"></div>
+        </div>
+
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <h3>Model pass / fail / good</h3>
+          </div>
+          <div id="chart-model-date" class="chart-area"></div>
+        </div>
+
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <h3>Serial pass / fail / good</h3>
+          </div>
+          <div id="chart-serial" class="chart-area"></div>
+        </div>
+
+        <div class="panel chart-panel">
+          <div class="panel-head">
+            <h3>By line pass / fail</h3>
+          </div>
+          <div id="chart-line-result" class="chart-area"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel panel-table">
+      <div class="panel-head">
+        <h2>Board records</h2>
+        <span id="loading-tag" class="loading-tag hidden">Updating…</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button type="button" id="prev" class="btn">Previous</button>
+        <span id="page-info">Page 1 of 1</span>
+        <button type="button" id="next" class="btn">Next</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="demo-csv-data.js"></script>
+  <script src="demo-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
