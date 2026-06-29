@@ -27,7 +27,7 @@ copy config.example.js config.js
 
 ### KPIs
 - Board count
-- Pass / Fail / Good counts
+- Pass / NG / Good counts
 - Yield %
 
 ### Filters
@@ -38,13 +38,13 @@ copy config.example.js config.js
 | **Model** | Board / PCB model |
 
 ### Pie charts (selected time range)
-- **General pass / fail** — overall Pass vs Fail
-- **Model pass / fail / good** — Good / Pass / Fail mix
-- **Serial pass / fail / good** — result distribution by board serial
-- **By line pass / fail** — Pass vs Fail per line
+- **General pass / NG** — overall Pass vs NG
+- **Model pass / NG / good** — Good / Pass / NG mix
+- **Serial pass / NG / good** — result distribution by board serial
+- **By line pass / NG** — Pass vs NG per line
 
 ### Board records table
-Paginated list with date, serial, model, line, pass/fail result, and pad count.
+Paginated list with date, serial, model, line, pass/NG result, and pad count.
 
 ## Project structure
 
@@ -166,8 +166,8 @@ fields: {
   line: "line",
   model: "model",
   serial: "board_id",    // used for cardinality (board count)
-  general: "general",    // PASS / FAIL
-  result: "result",      // GOOD / PASS / FAIL
+  general: "general",    // PASS / NG
+  result: "result",      // GOOD / PASS / NG
 }
 ```
 

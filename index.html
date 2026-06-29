@@ -6,37 +6,50 @@
   <title>SMT Board Dashboard</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
+  <!-- ================= HEADER ================= -->
   <header class="header">
     <div class="header-title">
       <h1>SMT Board Dashboard</h1>
       <span id="status" class="status status-bad">Disconnected</span>
     </div>
 
+    <!-- Filters -->
     <div class="filters">
       <label class="filter">
         <span>Time</span>
         <select id="time"></select>
       </label>
+
       <label class="filter">
         <span>Line</span>
-        <select id="line"><option value="">All lines</option></select>
+        <select id="line">
+          <option value="">All lines</option>
+        </select>
       </label>
+
       <label class="filter">
         <span>Model</span>
-        <select id="model"><option value="">All models</option></select>
+        <select id="model">
+          <option value="">All models</option>
+        </select>
       </label>
+
       <button type="button" id="refresh" class="btn">Refresh</button>
     </div>
 
+    <!-- Meta -->
     <div class="meta">
       <span id="updated">—</span>
       <span id="mode-label">—</span>
     </div>
   </header>
 
+
+  <!-- ================= BANNERS ================= -->
   <div id="demo-banner" class="banner banner-demo hidden">
-    Demo mode — board results from synthetic + CSV data. Set <code>useDemo: false</code> in config.js for live Elasticsearch.
+    Demo mode — using local data. Set <code>useDemo: false</code> in config.js for Elasticsearch.
   </div>
 
   <div id="error" class="banner banner-error hidden" role="alert">
@@ -44,85 +57,113 @@
     <button type="button" id="retry" class="btn btn-inline">Retry</button>
   </div>
 
+  <!-- ================= MAIN ================= -->
   <main class="main">
-    <section class="kpi-row">
-      <div class="kpi-card kpi-card-highlight">
-        <span class="kpi-label">Board count</span>
-        <span id="kpi-boards" class="kpi-value">—</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">Pass</span>
-        <span id="kpi-pass" class="kpi-value kpi-ok">—</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">Fail</span>
-        <span id="kpi-fail" class="kpi-value kpi-error">—</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">Good</span>
-        <span id="kpi-good" class="kpi-value kpi-good">—</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">Yield</span>
-        <span id="kpi-yield" class="kpi-value">—</span>
+
+    <!-- ================= BOARD KPI ================= -->
+    <section class="kpi-section">
+      <h2 class="section-title">Board KPIs</h2>
+
+      <section class="kpi-row">
+
+        <div class="kpi-card kpi-card-highlight">
+          <span class="kpi-label">Boards</span>
+          <span id="kpi-board-count" class="kpi-value">—</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Pass</span>
+          <span id="kpi-board-pass" class="kpi-value kpi-ok">—</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Fail</span>
+          <span id="kpi-board-fail" class="kpi-value kpi-error">—</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Yield</span>
+          <span id="kpi-board-yield" class="kpi-value">—</span>
+        </div>
+
+      </section>
+
+      <!-- ✅ Board chart -->
+      <div class="panel chart-panel">
+        <div class="panel-head">
+          <h3>Board PASS / FAIL</h3>
+        </div>
+        <div id="chart-board" class="chart-area"></div>
       </div>
     </section>
 
-    <section class="dashboard-section">
-      <h2 class="section-title">Board results</h2>
-      <div class="charts-grid">
-        <div class="panel chart-panel">
-          <div class="panel-head">
-            <h3>General pass / fail</h3>
-          </div>
-          <div id="chart-general-date" class="chart-area"></div>
+    <!-- ================= PAD KPI ================= -->
+    <section class="kpi-section">
+      <h2 class="section-title">Pad KPIs</h2>
+
+      <section class="kpi-row">
+
+        <div class="kpi-card kpi-card-highlight">
+          <span class="kpi-label">Pads</span>
+          <span id="kpi-pad-count" class="kpi-value">—</span>
         </div>
 
-        <div class="panel chart-panel">
-          <div class="panel-head">
-            <h3>Model pass / fail / good</h3>
-          </div>
-          <div id="chart-model-date" class="chart-area"></div>
+        <div class="kpi-card">
+          <span class="kpi-label">Pass</span>
+          <span id="kpi-pad-pass" class="kpi-value kpi-ok">—</span>
         </div>
 
-        <div class="panel chart-panel">
-          <div class="panel-head">
-            <h3>Serial pass / fail / good</h3>
-          </div>
-          <div id="chart-serial" class="chart-area"></div>
+        <div class="kpi-card">
+          <span class="kpi-label">Fail</span>
+          <span id="kpi-pad-fail" class="kpi-value kpi-error">—</span>
         </div>
 
-        <div class="panel chart-panel">
-          <div class="panel-head">
-            <h3>By line pass / fail</h3>
-          </div>
-          <div id="chart-line-result" class="chart-area"></div>
+        <div class="kpi-card">
+          <span class="kpi-label">Yield</span>
+          <span id="kpi-pad-yield" class="kpi-value">—</span>
         </div>
+
+      </section>
+
+      <!-- ✅ Pad chart -->
+      <div class="panel chart-panel">
+        <div class="panel-head">
+          <h3>Pad Result Distribution</h3>
+        </div>
+        <div id="chart-pad" class="chart-area"></div>
       </div>
     </section>
 
+    <!-- ================= TABLE ================= -->
     <section class="panel panel-table">
       <div class="panel-head">
-        <h2>Board records</h2>
+        <h2>Board Records (Pad-level rows)</h2>
         <span id="loading-tag" class="loading-tag hidden">Updating…</span>
       </div>
+
       <div class="table-wrap">
         <table>
           <thead id="thead"></thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
+
       <div class="pager">
         <button type="button" id="prev" class="btn">Previous</button>
         <span id="page-info">Page 1 of 1</span>
         <button type="button" id="next" class="btn">Next</button>
       </div>
     </section>
+
   </main>
 
+
+
+  <!-- ================= SCRIPTS ================= -->
   <script src="config.js"></script>
   <script src="demo-csv-data.js"></script>
   <script src="demo-data.js"></script>
   <script src="app.js"></script>
+
 </body>
 </html>

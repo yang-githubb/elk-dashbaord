@@ -14,8 +14,8 @@
     let result = "GOOD";
     let general = "PASS";
     if (i % 13 === 0) {
-      result = "FAIL";
-      general = "FAIL";
+      result = "NG";
+      general = "NG";
     } else if (i % 7 === 0) {
       result = "PASS";
       general = "PASS";
@@ -30,7 +30,7 @@
       serial,
       board_id: serial,
       station: `ST-${String((i % 6) + 1).padStart(2, "0")}`,
-      status: result === "FAIL" ? "ERROR" : "OK",
+      status: result === "NG" ? "ERROR" : "OK",
       result,
       general,
       pad_result: result === "GOOD" ? "GOOD" : result,
