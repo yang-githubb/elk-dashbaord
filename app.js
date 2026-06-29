@@ -1,21 +1,21 @@
+/**
+ * SMT Board Dashboard
+ *
+ * Board list (serial numbers via composite agg) → click serial → pad inspection table.
+ * KPIs/charts use ES aggregations; never loads full dataset in browser.
+ */
 
-let boardKpiCache = null;
-let boardKpiTs = 0;
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-const BOARD_CACHE_MS = 180_000; // 3 min
+const STATION = "SPI";
+const BOARD_CACHE_MS = 180_000;
 const REFRESH_MS = 120_000;
 const HEALTH_MS = 60_000;
 const PAGE_SIZE = 25;
 const FETCH_TIMEOUT_MS = 35_000;
-
-const TIME_RANGES = {
-  "15m": 15 * 60 * 1000,
-  "1h": 60 * 60 * 1000,
-  "6h": 6 * 60 * 60 * 1000,
-  "24h": 24 * 60 * 60 * 1000,
-  "7d": 7 * 24 * 60 * 60 * 1000,
-  "30d": 30 * 24 * 60 * 60 * 1000,
-};
+const COMPOSITE_PAGE_SIZE = 5000;
 
 const TIME_LABELS = {
   all: "All time",
@@ -41,9 +41,44 @@ const ES_TIME_RANGES = {
 const RESULT_COLORS = {
   GOOD: "#22c55e",
   PASS: "#f59e0b",
-  FAIL: "#ef4444"
+  FAIL: "#ef4444",
 };
 
+const BOARD_COLUMNS = [
+  { key: "serial", label: "Serial" },
+  { key: "model", label: "PCB Name" },
+  { key: "line", label: "Line" },
+  { key: "timestamp", label: "Last Inspection", type: "time" },
+  { key: "pad_count", label: "Pads", type: "number" },
+  { key: "result", label: "Result", type: "result" },
+];
+
+const PAD_COLUMNS = [
+  { key: "timestamp", label: "Timestamp", type: "time" },
+  { key: "model", label: "PCB Name" },
+  { key: "line", label: "Line" },
+  { key: "station", label: "Station" },
+  { key: "machine", label: "Machine" },
+  { key: "component_id", label: "Component" },
+  { key: "pad_no", label: "Pad No" },
+  { key: "volume", label: "Volume", type: "number" },
+  { key: "height", label: "Height", type: "number" },
+  { key: "area", label: "Area", type: "number" },
+  { key: "offset_x", label: "Offset X", type: "number" },
+  { key: "offset_y", label: "Offset Y", type: "number" },
+  { key: "is_defect", label: "Defect", type: "bool" },
+  { key: "inspection_date", label: "Insp. Date" },
+];
+
+const PAD_SOURCE_FIELDS = [
+  "timestamp", "pcb_name", "line", "station", "machine",
+  "component_id", "pad_no", "volume", "height", "area", "offset_x", "offset_y",
+  "is_defect", "inspection_date",
+];
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
 
 const $ = (id) => document.getElementById(id);
 
@@ -51,77 +86,39 @@ const state = {
   time: "all",
   line: "",
   model: "",
-  page: 0,
-  fields: { time: "@timestamp", line: "line", station: "station" },
-  totalPages: 1,
+  view: "boards",
+  selectedSerial: null,
+  boardPage: 0,
+  padPage: 0,
+  boardTotalPages: 1,
+  padTotalPages: 1,
+  boardAfterStack: [null],
   loading: false,
   abort: null,
 };
+
+let boardKpiCache = null;
+let boardKpiTs = 0;
+
+// ---------------------------------------------------------------------------
+// Config helpers
+// ---------------------------------------------------------------------------
 
 function cfg() {
   return window.ES_CONFIG ?? {};
 }
 
-// function extractBoards(records) {
-//   const map = new Map();
-
-//   for (const r of records) {
-//     const serial = r.serial || r.board_id || r.array_barcode || r.id;
-//     const model = r.model || r.line || "Unknown";
-//     const line = r.line || "Unknown";
-//     const ts = r["@timestamp"] || r[state.fields?.time];
-//     const padResult = normalizePcbResult(r.pcb_result);
-
-//     if (!map.has(serial)) {
-//       map.set(serial, {
-//         id: serial,
-//         serial,
-//         model,
-//         line,
-//         "@timestamp": ts,
-//         date: ts ? ts.slice(0, 10) : "Unknown",
-//         padResults: [],
-//         source: r.source || "unknown",
-//       });
-//     }
-
-//     const board = map.get(serial);
-//     board.padResults.push(padResult);
-//     if (ts && new Date(ts) > new Date(board["@timestamp"])) {
-//       board["@timestamp"] = ts;
-//       board.date = ts.slice(0, 10);
-//     }
-//     if (r.model) board.model = r.model;
-//     if (r.line) board.line = r.line;
-//   }
-
-//   return [...map.values()].map((b) => {
-//     const result = worstResult(b.padResults);
-//     return {
-//       ...b,
-//       result,
-//       general: generalFromResult(result),
-//       pad_count: b.padResults.length,
-//     };
-//   });
-// }
-
-function isAllTime() {
-  return state.time === "all";
-}
-
-function timeSelectOptions() {
-  return TIME_ORDER.map((t) => ({ value: t, label: TIME_LABELS[t] || t }));
+function useMock() {
+  return cfg().useMock === true;
 }
 
 function getFields() {
   const defaults = {
-    time: "@timestamp",
+    time: "timestamp",
     line: "line",
-    model: "model",
-    serial: "board_id",
-    general: "general",
-    result: "result",
+    model: "pcb_name",
+    serial: "array_barcode",
+    station: "station",
   };
   return { ...defaults, ...(cfg().fields ?? {}) };
 }
@@ -130,267 +127,219 @@ function esField(field) {
   return field.includes(".") ? field : `${field}.keyword`;
 }
 
+function isAllTime() {
+  return state.time === "all";
+}
+
+// ---------------------------------------------------------------------------
+// Elasticsearch query building
+// ---------------------------------------------------------------------------
+
 function buildEsFilters() {
   const fields = getFields();
   const filters = [];
-  
+
   if (!isAllTime()) {
     filters.push({ range: { [fields.time]: { gte: ES_TIME_RANGES[state.time] } } });
   }
-  if (state.line) filters.push({ term: { [esField(fields.line)]: state.line } });
-  if (state.model) filters.push({ term: { [esField(fields.model)]: state.model } });
-  filters.push({ term: { "station.keyword": "SPI" } });
+  if (state.line) {
+    filters.push({ term: { [esField(fields.line)]: state.line } });
+  }
+  if (state.model) {
+    filters.push({ term: { [esField(fields.model)]: state.model } });
+  }
+  filters.push({ term: { [esField(fields.station)]: STATION } });
+
   return filters;
 }
 
-function termsToCounts(buckets, keys) {
-  const counts = Object.fromEntries(keys.map((k) => [k, 0]));
-  for (const b of buckets ?? []) {
-    const key = String(b.key).toUpperCase();
-    if (counts[key] !== undefined) counts[key] = b.doc_count;
-  }
-  return counts;
+function buildPadFilters(serial) {
+  const fields = getFields();
+  return [...buildEsFilters(), { term: { [esField(fields.serial)]: serial } }];
+}
+
+function buildEsQuery(filters) {
+  return filters.length ? { bool: { filter: filters } } : { match_all: {} };
 }
 
 function buildDashboardAggs() {
   return {
-
-    // ✅ total pads
-    total_count: {
-      value_count: { field: "pcb_result.keyword" }
-    },
-
-    // ✅ total boards (DISTINCT)
-    total_boards: {
-      cardinality: {
-        field: "array_barcode.keyword"
-      }
-    },
-
-    pcb_results: {
-      terms: {
-        field: "pcb_result.keyword",
-        size: 10
-      }
-    },
-
-    count_good: {
-      filter: { term: { "pcb_result.keyword": "GOOD" } }
-    },
-
-    count_pass: {
-      filter: {
-        terms: { "pcb_result.keyword": ["PASS", "WARNING"] }
-      }
-    },
-
-    count_fail: {
-      filter: { term: { "pcb_result.keyword": "NG" } }
-    }
+    total_count: { value_count: { field: "pcb_result.keyword" } },
+    total_boards: { cardinality: { field: "array_barcode.keyword" } },
+    count_good: { filter: { term: { "pcb_result.keyword": "GOOD" } } },
+    count_pass: { filter: { terms: { "pcb_result.keyword": ["PASS", "WARNING"] } } },
+    count_fail: { filter: { term: { "pcb_result.keyword": "NG" } } },
   };
 }
 
-function hitToTableRow(hit) {
-  const fields = getFields();
-  const s = hit._source ?? {};
-  const ts = s[fields.time];
-
-  const result = normalizePcbResult(s.pcb_result);
-
-  return {
-    date: ts ? String(ts).slice(0, 10) : "—",
-    serial: s[fields.serial] ?? hit._id,
-    model: s[fields.model] ?? "—",
-    line: s[fields.line] ?? "—",
-    general: result,   // same now
-    result: result,
-    source: "elk",
-  };
-}
-
-/**
- * Safely set text content on a DOM element
- * Prevents "Cannot set properties of null" crash
- */
-function setText(id, value) {
-  const el = $(id);
-  if (!el) {
-    console.warn(`Missing element: ${id}`);
-    return;
-  }
-  el.textContent = value;
-}
-
-function normalizePcbResult(value) {
-  const v = String(value || "").toUpperCase();
-
-  if (v === "GOOD") return "GOOD";
-  if (v === "PASS" || v === "WARNING") return "PASS";
-  if (v === "NG") return "FAIL";
-
-  return "PASS"; // safe fallback
-}
-
-function applyEsView(aggRes, tableRows, totalHits, page, boardKpi) {
-  state.page = page;
-
-  const aggs = aggRes.aggregations ?? {};
-
-  // ✅ raw counts
-  const good = aggs.count_good?.doc_count ?? 0;
-  const pass = aggs.count_pass?.doc_count ?? 0;
-  const fail = aggs.count_fail?.doc_count ?? 0;
-  const boards = aggs.total_boards?.value ?? 0;
-  const total = good + pass + fail;
-
-  // ✅ final model
-  const counts = {
-    GOOD: good,
-    PASS: pass,
-    FAIL: fail
-  };
-
-  // ✅ correct yield
-  const yieldPct = total
-    ? ((good + pass) / total) * 100
-    : 0;
-
-  // ✅ paging
-  state.totalPages = totalHits
-    ? Math.ceil(totalHits / PAGE_SIZE)
-    : page + (tableRows.length === PAGE_SIZE ? 2 : 1);
-
-  const boardPass = boardKpi.boardPass;
-  const boardFail = boardKpi.boardFail;
-  const boardCount = boardKpi.boardCount;
-  const boardYield = boardKpi.boardYield;
-
-  // ✅ BOARD KPI
-  setText("kpi-board-count", boardCount.toLocaleString());
-  setText("kpi-board-pass", boardPass.toLocaleString());
-  setText("kpi-board-fail", boardFail.toLocaleString());
-  setText("kpi-board-yield", `${boardYield.toFixed(2)}%`);
-
-  // ✅ PAD KPI
-  setText("kpi-pad-count", total.toLocaleString());
-  setText("kpi-pad-pass", pass.toLocaleString());
-  setText("kpi-pad-fail", fail.toLocaleString());
-  setText("kpi-pad-yield", `${yieldPct.toFixed(2)}%`);
-
-  renderCenteredPie(
-    $("chart-board"),
-    {
-      PASS: boardPass,
-      FAIL: boardFail
-    },
-    ["PASS", "FAIL"],
-    {
-      PASS: "Pass",
-      FAIL: "Fail"
-    }
-  );
-  
-  renderCenteredPie(
-    $("chart-pad"),
-    {
-      GOOD: good,
-      PASS: pass,
-      FAIL: fail
-    },
-    ["GOOD", "PASS", "FAIL"],
-    {
-      GOOD: "Good",
-      PASS: "Pass",
-      FAIL: "Fail"
-    }
-  );
-
-
-  renderTable(tableRows);
-  updatePager();
-  updateModeLabel(total);
-}
-
-async function computeBoardKpiComposite(controller) {
-  let afterKey = null;
-
-  let boardPass = 0;
-  let boardFail = 0;
-  let totalBoards = 0;
-
-  while (true) {
-    const res = await esSearch(
-      buildBoardCompositeAgg(afterKey),
-      controller.signal
-    );
-
-    const buckets = res.aggregations?.boards?.buckets ?? [];
-
-    if (!buckets.length) break;
-
-    for (const b of buckets) {
-      totalBoards++;
-
-      if (b.has_ng.doc_count > 0) {
-        boardFail++;
-      } else {
-        boardPass++;
-      }
-    }
-
-    afterKey = res.aggregations.boards.after_key;
-
-    if (!afterKey) break; // ✅ done all pages
-  }
-
-  return {
-    boardCount: totalBoards,
-    boardPass,
-    boardFail,
-    boardYield: totalBoards
-      ? (boardPass / totalBoards) * 100
-      : 0
-  };
-}
-
-function buildBoardCompositeAgg(afterKey = null) {
+/** KPI composite — walks all boards in pages of 5000. */
+function buildBoardKpiAgg(afterKey = null) {
   const agg = {
     size: 0,
     query: buildEsQuery(buildEsFilters()),
     aggs: {
       boards: {
         composite: {
-          size: 5000, 
-          sources: [
-            {
-              board: {
-                terms: { field: "array_barcode.keyword" }
-              }
-            }
-          ]
+          size: COMPOSITE_PAGE_SIZE,
+          sources: [{ board: { terms: { field: "array_barcode.keyword" } } }],
         },
         aggs: {
-          has_ng: {
-            filter: {
-              term: { "pcb_result.keyword": "NG" }
-            }
-          }
-        }
-      }
-    }
+          has_ng: { filter: { term: { "pcb_result.keyword": "NG" } } },
+        },
+      },
+    },
   };
-
-  if (afterKey) {
-    agg.aggs.boards.composite.after = afterKey;
-  }
-
+  if (afterKey) agg.aggs.boards.composite.after = afterKey;
   return agg;
 }
 
-function updateModeLabel(padCount) {
-  const range = TIME_LABELS[state.time] || state.time;
-  $("mode-label").textContent =
-    `${padCount} pads · ${range} · auto-refresh every ${REFRESH_MS / 1000}s`;
+/** Board list table — one composite page (25 boards). */
+function buildBoardListAgg(afterKey = null) {
+  const fields = getFields();
+  const agg = {
+    size: 0,
+    query: buildEsQuery(buildEsFilters()),
+    aggs: {
+      boards: {
+        composite: {
+          size: PAGE_SIZE,
+          sources: [{ board: { terms: { field: "array_barcode.keyword" } } }],
+        },
+        aggs: {
+          latest: { max: { field: fields.time } },
+          top_line: { terms: { field: esField(fields.line), size: 1 } },
+          top_model: { terms: { field: esField(fields.model), size: 1 } },
+          pad_count: { value_count: { field: "pad_no" } },
+          has_ng: { filter: { term: { "pcb_result.keyword": "NG" } } },
+        },
+      },
+    },
+  };
+  if (afterKey) agg.aggs.boards.composite.after = afterKey;
+  return agg;
+}
+
+// ---------------------------------------------------------------------------
+// Result normalization
+// ---------------------------------------------------------------------------
+
+function normalizePcbResult(value) {
+  const v = String(value || "").toUpperCase();
+  if (v === "GOOD") return "GOOD";
+  if (v === "PASS" || v === "WARNING") return "PASS";
+  if (v === "NG") return "FAIL";
+  return "PASS";
+}
+
+function boardBucketToRow(bucket) {
+  const hasNg = (bucket.has_ng?.doc_count ?? 0) > 0;
+  const latest = bucket.latest?.value;
+  return {
+    serial: bucket.key.board,
+    model: bucket.top_model?.buckets?.[0]?.key ?? null,
+    line: bucket.top_line?.buckets?.[0]?.key ?? null,
+    timestamp: latest != null ? (typeof latest === "number" ? new Date(latest).toISOString() : latest) : null,
+    pad_count: bucket.pad_count?.value ?? bucket.doc_count ?? 0,
+    result: hasNg ? "FAIL" : "PASS",
+  };
+}
+
+function hitToPadRow(hit) {
+  const fields = getFields();
+  const s = hit._source ?? {};
+  const ts = s[fields.time] ?? s.timestamp;
+
+  return {
+    timestamp: ts ?? null,
+    model: s[fields.model] ?? s.pcb_name ?? null,
+    line: s.line ?? null,
+    station: s.station ?? null,
+    machine: s.machine ?? null,
+    component_id: s.component_id ?? null,
+    pad_no: s.pad_no ?? null,
+    volume: s.volume ?? null,
+    height: s.height ?? null,
+    area: s.area ?? null,
+    offset_x: s.offset_x ?? null,
+    offset_y: s.offset_y ?? null,
+    is_defect: s.is_defect ?? null,
+    inspection_date: s.inspection_date ?? null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// DOM helpers
+// ---------------------------------------------------------------------------
+
+function setText(id, value) {
+  const el = $(id);
+  if (el) el.textContent = value;
+}
+
+function showError(message) {
+  $("error-text").textContent = message;
+  $("error").classList.remove("hidden");
+}
+
+function hideError() {
+  $("error").classList.add("hidden");
+}
+
+function setLoading(active) {
+  state.loading = active;
+  $("refresh").disabled = active;
+  $("loading-tag").classList.toggle("hidden", !active || state.view !== "boards");
+  $("pad-loading-tag").classList.toggle("hidden", !active || state.view !== "pads");
+}
+
+function setStatus(connected) {
+  const el = $("status");
+  el.textContent = connected ? "Connected" : "Disconnected";
+  el.className = connected ? "status status-ok" : "status status-bad";
+}
+
+function setMockBanner(visible) {
+  $("mock-banner")?.classList.toggle("hidden", !visible);
+}
+
+function showBoardView() {
+  state.view = "boards";
+  $("board-panel").classList.remove("hidden");
+  $("pad-panel").classList.add("hidden");
+}
+
+function showPadView(serial) {
+  state.view = "pads";
+  state.selectedSerial = serial;
+  setText("pad-serial-label", serial);
+  $("board-panel").classList.add("hidden");
+  $("pad-panel").classList.remove("hidden");
+}
+
+function fillSelect(select, options, labelFn) {
+  const current = select.value;
+  select.innerHTML = "";
+  for (const opt of options) {
+    const el = document.createElement("option");
+    el.value = opt.value;
+    el.textContent = labelFn ? labelFn(opt) : opt.label;
+    select.appendChild(el);
+  }
+  if ([...select.options].some((o) => o.value === current)) {
+    select.value = current;
+  }
+}
+
+function cellValue(value) {
+  if (value == null) return "—";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function formatNumber(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return cellValue(value);
+  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
 function formatTime(value) {
@@ -404,61 +353,63 @@ function formatTime(value) {
   });
 }
 
-function cellValue(value) {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
+function formatTableCell(col, raw) {
+  if (raw == null) return "—";
+  if (col.type === "bool") return raw ? "Yes" : "No";
+  if (col.type === "number") return formatNumber(raw);
+  if (col.type === "time") return formatTime(raw);
+  return cellValue(raw);
 }
 
-function showError(message) {
-  $("error-text").textContent = message;
-  $("error").classList.remove("hidden");
+function resultPillHtml(value) {
+  const label = cellValue(value);
+  const color = RESULT_COLORS[value] ?? "#8b9cb3";
+  return `<span class="result-pill" style="background:${color}22;color:${color};border-color:${color}55">${label}</span>`;
 }
 
-function hideError() {
-  $("error").classList.add("hidden");
+function updateModeLabel(padCount, boardCount) {
+  const range = TIME_LABELS[state.time] || state.time;
+  setText("mode-label", `${boardCount} boards · ${padCount} pads · ${range} · refresh ${REFRESH_MS / 1000}s`);
 }
 
-function setStatus(mode) {
-  const el = $("status");
-  if (mode === "live") {
-    el.textContent = "Connected";
-    el.className = "status status-ok";
-  } else {
-    el.textContent = "Disconnected";
-    el.className = "status status-bad";
-  }
+function updateBoardPager() {
+  setText("board-page-info", `Page ${state.boardPage + 1} of ${state.boardTotalPages}`);
+  $("board-prev").disabled = state.boardPage <= 0 || state.loading;
+  $("board-next").disabled = state.boardPage + 1 >= state.boardTotalPages || state.loading;
 }
 
-function fillSelect(select, options, labelFn) {
-  const current = select.value;
-  select.innerHTML = "";
-  for (const opt of options) {
-    const el = document.createElement("option");
-    el.value = opt.value;
-    el.textContent = labelFn ? labelFn(opt) : opt.label;
-    select.appendChild(el);
-  }
-  if ([...select.options].some((o) => o.value === current)) select.value = current;
+function updatePadPager() {
+  setText("pad-page-info", `Page ${state.padPage + 1} of ${state.padTotalPages}`);
+  $("pad-prev").disabled = state.padPage <= 0 || state.loading;
+  $("pad-next").disabled = state.padPage + 1 >= state.padTotalPages || state.loading;
 }
 
-// function countBoards(boards, field, keys) {
-//   const counts = Object.fromEntries(keys.map((k) => [k, 0]));
-//   for (const b of boards) {
-//     const v = b[field];
-//     if (counts[v] !== undefined) counts[v]++;
-//   }
-//   return counts;
-// }
+function resetBoardPaging() {
+  state.boardPage = 0;
+  state.boardAfterStack = [null];
+  state.boardTotalPages = 1;
+}
+
+function resetPadPaging() {
+  state.padPage = 0;
+  state.padTotalPages = 1;
+}
+
+function invalidateBoardCache() {
+  boardKpiCache = null;
+  boardKpiTs = 0;
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
 
 function pieHtml(counts, keys, labels, size = "md") {
   const items = keys
     .filter((k) => counts[k] > 0)
     .map((k) => ({ key: k, count: counts[k], label: labels[k] || k, color: RESULT_COLORS[k] }));
 
-  if (!items.length) {
-    return '<p class="empty-note">No data</p>';
-  }
+  if (!items.length) return '<p class="empty-note">No data</p>';
 
   const total = items.reduce((s, i) => s + i.count, 0);
   let pct = 0;
@@ -486,146 +437,146 @@ function pieHtml(counts, keys, labels, size = "md") {
 }
 
 function renderCenteredPie(container, counts, keys, labels, size = "lg") {
-  container.innerHTML = "";
+  if (!container) return;
   const hasData = keys.some((k) => counts[k] > 0);
-  if (!hasData) {
-    container.innerHTML = '<p class="empty-note">No data for selected filters.</p>';
-    return;
-  }
-  container.innerHTML = `<div class="pie-center">${pieHtml(counts, keys, labels, size)}</div>`;
+  container.innerHTML = hasData
+    ? `<div class="pie-center">${pieHtml(counts, keys, labels, size)}</div>`
+    : '<p class="empty-note">No data for selected filters.</p>';
 }
 
-// function renderGeneralDatePieChart(container, boards) {
-//   if (!boards.length) {
-//     container.innerHTML = '<p class="empty-note">No data for selected filters.</p>';
-//     return;
-//   }
-//   const counts = countBoards(boards, "general", ["PASS", "FAIL"]);
-//   renderCenteredPie(container, counts, ["PASS", "FAIL"], { PASS: "Pass", FAIL: "Fail" });
-// }
-
-// function renderModelDatePieChart(container, boards) {
-//   if (!boards.length) {
-//     container.innerHTML = '<p class="empty-note">No data for selected filters.</p>';
-//     return;
-//   }
-//   const counts = countBoards(boards, "result", ["GOOD", "PASS", "FAIL"]);
-//   renderCenteredPie(container, counts, ["GOOD", "PASS", "FAIL"], { GOOD: "Good", PASS: "Pass", FAIL: "Fail" });
-// }
-
-// function renderSerialPieChart(container, boards) {
-//   if (!boards.length) {
-//     container.innerHTML = '<p class="empty-note">No data for selected filters.</p>';
-//     return;
-//   }
-//   const counts = countBoards(boards, "result", ["GOOD", "PASS", "FAIL"]);
-//   renderCenteredPie(container, counts, ["GOOD", "PASS", "FAIL"], { GOOD: "Good", PASS: "Pass", FAIL: "Fail" });
-// }
-
-// function renderLinePassNGPieChart(container, boards) {
-//   if (!boards.length) {
-//     container.innerHTML = '<p class="empty-note">No data for selected filters.</p>';
-//     return;
-//   }
-//   const counts = countBoards(boards, "general", ["PASS", "FAIL"]);
-//   renderCenteredPie(container, counts, ["PASS", "FAIL"], { PASS: "Pass", FAIL: "Fail" });
-// }
-
-// function renderKpis(boards) {
-//   const pass = boards.filter(b => b.result === "PASS").length;
-//   const fail = boards.filter(b => b.result === "FAIL").length;
-//   const good = boards.filter(b => b.result === "GOOD").length;
-
-//   const total = good + pass + fail;
-//   const yieldPct = total ? Math.round(((good + pass) / total) * 100) : 0;
-
-//   $("kpi-boards").textContent = total.toLocaleString();
-//   $("kpi-good").textContent = good.toLocaleString();
-//   $("kpi-pass").textContent = pass.toLocaleString();
-//   $("kpi-fail").textContent = fail.toLocaleString();
-//   $("kpi-yield").textContent = `${yieldPct}%`;
-// }
-
-// function renderBoardCharts(boards) {
-//   renderGeneralDatePieChart($("chart-general-date"), boards);
-//   renderModelDatePieChart($("chart-model-date"), boards);
-//   renderSerialPieChart($("chart-serial"), boards);
-//   renderLinePassNGPieChart($("chart-line-result"), boards);
-// }
-
-function renderTable(hits) {
-  const columns = ["date", "serial", "model", "line", "general", "result", "source"];
-  const thead = $("thead");
-  const tbody = $("tbody");
+function renderDataTable(theadId, tbodyId, columns, rows, options = {}) {
+  const thead = $(theadId);
+  const tbody = $(tbodyId);
   thead.innerHTML = "";
   tbody.innerHTML = "";
 
   const headRow = document.createElement("tr");
   for (const col of columns) {
     const th = document.createElement("th");
-    th.textContent = col.replace("_", " ");
+    th.textContent = col.label;
     headRow.appendChild(th);
   }
   thead.appendChild(headRow);
 
-  if (!hits.length) {
+  if (!rows.length) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
     td.colSpan = columns.length;
     td.className = "empty-cell";
-    td.textContent = state.loading ? "Loading…" : "No boards match the current filters.";
+    td.textContent = state.loading ? "Loading…" : (options.emptyText || "No records match the current filters.");
     tr.appendChild(td);
     tbody.appendChild(tr);
     return;
   }
 
-  for (const row of hits) {
+  for (const row of rows) {
     const tr = document.createElement("tr");
+    if (options.clickable) tr.classList.add("row-clickable");
+
     for (const col of columns) {
       const td = document.createElement("td");
-      const raw = row[col];
-      if (col === "general" || col === "result") {
-        const cls = String(raw).toLowerCase();
-        const color = RESULT_COLORS[raw] ?? "#8b9cb3";
-        td.innerHTML = `<span class="result-pill" style="background:${color}22;color:${color};border-color:${color}55">${cellValue(raw)}</span>`;
+      const raw = row[col.key];
+
+      if (col.key === "serial" && options.onSerialClick) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "serial-link";
+        btn.textContent = cellValue(raw);
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          options.onSerialClick(raw);
+        });
+        td.appendChild(btn);
+      } else if (col.type === "result") {
+        td.innerHTML = resultPillHtml(raw);
       } else {
-        td.textContent = cellValue(raw);
+        td.textContent = formatTableCell(col, raw);
+        if (col.key === "model") td.title = formatTableCell(col, raw);
       }
       tr.appendChild(td);
     }
+
+    if (options.clickable && options.onRowClick) {
+      tr.addEventListener("click", () => options.onRowClick(row));
+    }
+
     tbody.appendChild(tr);
   }
 }
 
-// function applyView(boards, page) {
-//   state.page = page;
-//   state.totalPages = Math.max(1, Math.ceil(boards.length / PAGE_SIZE));
-//   const pageHits = boards.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-//   $("updated").textContent = `Updated ${formatTime(new Date().toISOString())}`;
-//   renderKpis(boards);
-//   //renderBoardCharts(boards);
-//   renderTable(pageHits);
-//   updatePager();
-//   updateModeLabel(boards.length);
-// }
-
-function updatePager() {
-  $("page-info").textContent = `Page ${state.page + 1} of ${state.totalPages}`;
-  $("prev").disabled = state.page <= 0 || state.loading;
-  $("next").disabled = state.page + 1 >= state.totalPages || state.loading;
+function renderBoardTable(rows) {
+  renderDataTable("board-thead", "board-tbody", BOARD_COLUMNS, rows, {
+    emptyText: "No boards match the current filters.",
+    clickable: true,
+    onSerialClick: openPadView,
+    onRowClick: (row) => openPadView(row.serial),
+  });
 }
 
-async function checkHealth() {
-  try {
-    const { node, username, password } = cfg();
-    const res = await fetch(node.replace(/\/$/, ""), {
-      headers: { Authorization: "Basic " + btoa(`${username}:${password}`) },
-    });
-    setStatus(res.ok ? "live" : "off");
-  } catch {
-    setStatus("off");
+function renderPadTable(rows) {
+  renderDataTable("pad-thead", "pad-tbody", PAD_COLUMNS, rows, {
+    emptyText: "No pads found for this serial.",
+  });
+}
+
+function applyKpis(aggRes, boardKpi) {
+  const aggs = aggRes.aggregations ?? {};
+  const good = aggs.count_good?.doc_count ?? 0;
+  const pass = aggs.count_pass?.doc_count ?? 0;
+  const fail = aggs.count_fail?.doc_count ?? 0;
+  const total = good + pass + fail;
+  const padYield = total ? ((good + pass) / total) * 100 : 0;
+
+  setText("kpi-board-count", boardKpi.boardCount.toLocaleString());
+  setText("kpi-board-pass", boardKpi.boardPass.toLocaleString());
+  setText("kpi-board-fail", boardKpi.boardFail.toLocaleString());
+  setText("kpi-board-yield", `${boardKpi.boardYield.toFixed(2)}%`);
+
+  setText("kpi-pad-count", total.toLocaleString());
+  setText("kpi-pad-pass", pass.toLocaleString());
+  setText("kpi-pad-fail", fail.toLocaleString());
+  setText("kpi-pad-yield", `${padYield.toFixed(2)}%`);
+
+  renderCenteredPie(
+    $("chart-board"),
+    { PASS: boardKpi.boardPass, FAIL: boardKpi.boardFail },
+    ["PASS", "FAIL"],
+    { PASS: "Pass", FAIL: "Fail" },
+  );
+
+  renderCenteredPie(
+    $("chart-pad"),
+    { GOOD: good, PASS: pass, FAIL: fail },
+    ["GOOD", "PASS", "FAIL"],
+    { GOOD: "Good", PASS: "Pass", FAIL: "Fail" },
+  );
+
+  updateModeLabel(total, boardKpi.boardCount);
+  setText("updated", `Updated ${formatTime(new Date())}`);
+}
+
+// ---------------------------------------------------------------------------
+// API layer
+// ---------------------------------------------------------------------------
+
+function searchUrl() {
+  const { proxyUrl, node, index } = cfg();
+  if (proxyUrl) {
+    if (proxyUrl.startsWith("http")) return proxyUrl;
+    const prefix = proxyUrl.startsWith("/") ? "" : "/";
+    return `${window.location.origin}${prefix}${proxyUrl}`;
   }
+  return `${node.replace(/\/$/, "")}/${index}/_search`;
+}
+
+function usesProxy() {
+  return Boolean(cfg().proxyUrl);
+}
+
+function proxyBaseUrl() {
+  const url = cfg().proxyUrl || "";
+  if (url.startsWith("http")) return url.replace(/\/search\/?$/, "");
+  return window.location.origin;
 }
 
 function authHeader() {
@@ -633,31 +584,33 @@ function authHeader() {
   return "Basic " + btoa(`${username}:${password}`);
 }
 
-function searchUrl() {
-  const { node, index } = cfg();
-  return `${node.replace(/\/$/, "")}/${index}`;
-}
-
-function buildEsQuery(filters) {
-  if (!filters.length) return { match_all: {} };
-  return { bool: { filter: filters } };
-}
-
 async function esSearch(body, signal) {
+  if (useMock()) return window.mockEsSearch(body);
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   const onAbort = () => controller.abort();
   signal?.addEventListener("abort", onAbort);
 
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (!usesProxy()) headers.Authorization = authHeader();
+
     const res = await fetch(searchUrl(), {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: authHeader() },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.reason || res.statusText);
+    if (!res.ok) {
+      const msg =
+        typeof data.error === "string"
+          ? data.error
+          : data.error?.reason || data.hint || res.statusText;
+      throw new Error(msg);
+    }
     return data;
   } finally {
     clearTimeout(timeout);
@@ -665,24 +618,69 @@ async function esSearch(body, signal) {
   }
 }
 
-async function loadLiveFilters() {
-  state.fields = getFields();
+async function computeBoardKpi(signal) {
+  const now = Date.now();
+  if (boardKpiCache && now - boardKpiTs < BOARD_CACHE_MS) {
+    return boardKpiCache;
+  }
+
+  let afterKey = null;
+  let boardPass = 0;
+  let boardFail = 0;
+  let boardCount = 0;
+
+  while (true) {
+    const res = await esSearch(buildBoardKpiAgg(afterKey), signal);
+    const buckets = res.aggregations?.boards?.buckets ?? [];
+    if (!buckets.length) break;
+
+    for (const b of buckets) {
+      boardCount++;
+      if (b.has_ng.doc_count > 0) boardFail++;
+      else boardPass++;
+    }
+
+    afterKey = res.aggregations.boards.after_key;
+    if (!afterKey) break;
+  }
+
+  boardKpiCache = {
+    boardCount,
+    boardPass,
+    boardFail,
+    boardYield: boardCount ? (boardPass / boardCount) * 100 : 0,
+  };
+  boardKpiTs = now;
+  return boardKpiCache;
+}
+
+// ---------------------------------------------------------------------------
+// Data loading
+// ---------------------------------------------------------------------------
+
+async function loadFilters() {
+  const fields = getFields();
   const filters = [];
+
   if (!isAllTime()) {
-    filters.push({ range: { [state.fields.time]: { gte: ES_TIME_RANGES[state.time] } } });
+    filters.push({ range: { [fields.time]: { gte: ES_TIME_RANGES[state.time] } } });
   }
 
   const res = await esSearch({
     size: 0,
     query: buildEsQuery(filters),
     aggs: {
-      lines: { terms: { field: esField(state.fields.line), size: 200, order: { _key: "asc" } } },
-      models: { terms: { field: esField(state.fields.model), size: 200, order: { _key: "asc" } } },
+      lines: { terms: { field: esField(fields.line), size: 200, order: { _key: "asc" } } },
+      models: { terms: { field: esField(fields.model), size: 200, order: { _key: "asc" } } },
     },
   });
 
-  fillSelect($("time"), timeSelectOptions(), (o) => o.label);
-  $("time").value = state.time || "all";
+  fillSelect(
+    $("time"),
+    TIME_ORDER.map((t) => ({ value: t, label: TIME_LABELS[t] || t })),
+    (o) => o.label,
+  );
+  $("time").value = state.time;
 
   const lines = res.aggregations?.lines?.buckets?.map((b) => String(b.key)) ?? [];
   const models = res.aggregations?.models?.buckets?.map((b) => String(b.key)) ?? [];
@@ -690,103 +688,203 @@ async function loadLiveFilters() {
   fillSelect($("line"), [{ value: "", label: "All lines" }, ...lines.map((l) => ({ value: l, label: l }))]);
   fillSelect($("model"), [{ value: "", label: "All models" }, ...models.map((m) => ({ value: m, label: m }))]);
 
+  setMockBanner(useMock());
 }
 
-async function loadLiveData(page, silent) {
-  state.loading = !silent;
+async function loadBoardList(signal) {
+  const afterKey = state.boardAfterStack[state.boardPage] ?? null;
+  const res = await esSearch(buildBoardListAgg(afterKey), signal);
+  const buckets = res.aggregations?.boards?.buckets ?? [];
+  const rows = buckets.map(boardBucketToRow);
+
+  const boardKpi = boardKpiCache ?? (await computeBoardKpi(signal));
+  state.boardTotalPages = Math.max(1, Math.ceil(boardKpi.boardCount / PAGE_SIZE));
+
+  const nextAfter = res.aggregations?.boards?.after_key;
+  if (nextAfter && state.boardAfterStack.length === state.boardPage + 1) {
+    state.boardAfterStack.push(nextAfter);
+  }
+
+  renderBoardTable(rows);
+  updateBoardPager();
+  return boardKpi;
+}
+
+async function loadPads(page = 0, signal) {
+  const fields = getFields();
+  const serial = state.selectedSerial;
+  if (!serial) return;
+
+  const res = await esSearch(
+    {
+      from: page * PAGE_SIZE,
+      size: PAGE_SIZE,
+      track_total_hits: true,
+      sort: [{ [fields.time]: { order: "desc" } }, { pad_no: { order: "asc" } }],
+      query: buildEsQuery(buildPadFilters(serial)),
+      _source: PAD_SOURCE_FIELDS,
+    },
+    signal,
+  );
+
+  const total =
+    typeof res.hits.total === "number" ? res.hits.total : (res.hits.total?.value ?? 0);
+  state.padTotalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  state.padPage = page;
+
+  renderPadTable(res.hits.hits.map(hitToPadRow));
+  updatePadPager();
+}
+
+async function loadDashboard(silent = false) {
+  if (!silent) setLoading(true);
   hideError();
-  $("refresh").disabled = true;
 
   state.abort?.abort();
   const controller = new AbortController();
   state.abort = controller;
 
   try {
-    const fields = getFields();
-    state.fields = fields;
-    const filters = buildEsFilters();
-    const query = buildEsQuery(filters);
+    if (state.view === "pads" && state.selectedSerial) {
+      const [aggRes, boardKpi] = await Promise.all([
+        esSearch({ size: 0, query: buildEsQuery(buildEsFilters()), aggs: buildDashboardAggs() }, controller.signal),
+        computeBoardKpi(controller.signal),
+      ]);
+      if (controller.signal.aborted) return;
+      applyKpis(aggRes, boardKpi);
+      await loadPads(state.padPage, controller.signal);
+      setStatus(true);
+      return;
+    }
 
-    const [aggRes, tableRes, boardKpi] = await Promise.all([
+    const query = buildEsQuery(buildEsFilters());
+    const [aggRes, boardKpi] = await Promise.all([
       esSearch({ size: 0, query, aggs: buildDashboardAggs() }, controller.signal),
-      esSearch(
-        {
-          from: page * PAGE_SIZE,
-          size: PAGE_SIZE,
-          track_total_hits: true,
-          sort: [{ [fields.time]: { order: "desc" } }],
-          query,
-        },
-        controller.signal
-      ),
-      (async () => {
-        const now = Date.now();
-
-        if (boardKpiCache && now - boardKpiTs < BOARD_CACHE_MS) {
-          return boardKpiCache;
-        }
-
-        const kpi = await computeBoardKpiComposite(controller);
-        boardKpiCache = kpi;
-        boardKpiTs = now;
-
-        return kpi;
-      })()
+      computeBoardKpi(controller.signal),
     ]);
 
     if (controller.signal.aborted) return;
 
-    const total =
-      typeof tableRes.hits.total === "number" ? tableRes.hits.total : (tableRes.hits.total?.value ?? 0);
-    const rows = tableRes.hits.hits.map(hitToTableRow);
-
-    applyEsView(aggRes, rows, total, page, boardKpi);
-    setStatus("live");
+    applyKpis(aggRes, boardKpi);
+    await loadBoardList(controller.signal);
+    setStatus(true);
   } catch (err) {
     if (controller.signal.aborted) return;
-    setStatus("off");
-    showError(err.message || "NGed to load data");
+    setStatus(false);
+    showError(err.message || "Failed to load data");
   } finally {
     if (!controller.signal.aborted) {
-      state.loading = false;
-      $("refresh").disabled = false;
+      setLoading(false);
+      updateBoardPager();
+      updatePadPager();
     }
   }
 }
 
-function loadFilters() {
-  return loadLiveFilters();
+async function checkHealth() {
+  if (useMock()) {
+    setStatus(true);
+    setMockBanner(true);
+    return;
+  }
+
+  setMockBanner(false);
+
+  if (usesProxy()) {
+    try {
+      const res = await fetch(`${proxyBaseUrl()}/search`, { method: "OPTIONS" });
+      setStatus(res.ok || res.status === 204);
+    } catch {
+      setStatus(false);
+    }
+    return;
+  }
+
+  try {
+    const { node, username, password } = cfg();
+    const res = await fetch(node.replace(/\/$/, ""), {
+      headers: { Authorization: "Basic " + btoa(`${username}:${password}`) },
+    });
+    setStatus(res.ok);
+  } catch {
+    setStatus(false);
+  }
 }
 
-function loadData(page, silent) {
-  return loadLiveData(page, silent);
+// ---------------------------------------------------------------------------
+// Navigation
+// ---------------------------------------------------------------------------
+
+function openPadView(serial) {
+  if (!serial) return;
+  showPadView(serial);
+  resetPadPaging();
+  loadDashboard();
+}
+
+function backToBoards() {
+  state.selectedSerial = null;
+  resetPadPaging();
+  showBoardView();
+  loadDashboard();
 }
 
 function onFilterChange() {
   state.time = $("time").value;
   state.line = $("line").value;
   state.model = $("model").value;
-  state.page = 0;
-  loadData(0);
+  state.selectedSerial = null;
+  resetBoardPaging();
+  resetPadPaging();
+  invalidateBoardCache();
+  showBoardView();
+  loadDashboard();
 }
+
+// ---------------------------------------------------------------------------
+// Events & init
+// ---------------------------------------------------------------------------
 
 $("time").addEventListener("change", onFilterChange);
 $("line").addEventListener("change", onFilterChange);
 $("model").addEventListener("change", onFilterChange);
-$("refresh").addEventListener("click", () => loadData(state.page));
-$("retry").addEventListener("click", () => loadData(state.page));
-$("prev").addEventListener("click", () => loadData(state.page - 1));
-$("next").addEventListener("click", () => loadData(state.page + 1));
+$("refresh").addEventListener("click", () => loadDashboard());
+$("retry").addEventListener("click", () => loadDashboard());
+$("back-boards").addEventListener("click", backToBoards);
 
-setInterval(() => loadData(state.page, true), REFRESH_MS);
+$("board-prev").addEventListener("click", () => {
+  if (state.boardPage > 0) {
+    state.boardPage--;
+    loadDashboard();
+  }
+});
+
+$("board-next").addEventListener("click", () => {
+  if (state.boardPage + 1 < state.boardTotalPages) {
+    state.boardPage++;
+    loadDashboard();
+  }
+});
+
+$("pad-prev").addEventListener("click", () => {
+  if (state.padPage > 0) {
+    state.padPage--;
+    loadDashboard();
+  }
+});
+
+$("pad-next").addEventListener("click", () => {
+  if (state.padPage + 1 < state.padTotalPages) {
+    state.padPage++;
+    loadDashboard();
+  }
+});
+
+setInterval(() => loadDashboard(true), REFRESH_MS);
 setInterval(checkHealth, HEALTH_MS);
 
 loadFilters()
-  .then(() => {
-    $("time").value = state.time || "all";
-    state.time = $("time").value;
-    return loadData(0);
-  })
-  .catch((err) => showError(err.message || "NGed to load"));
+  .then(() => loadDashboard())
+  .catch((err) => showError(err.message || "Failed to load"));
 
 checkHealth();

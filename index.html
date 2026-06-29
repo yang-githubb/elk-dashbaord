@@ -6,16 +6,13 @@
   <title>SMT Board Dashboard</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-
 <body>
-  <!-- ================= HEADER ================= -->
   <header class="header">
     <div class="header-title">
       <h1>SMT Board Dashboard</h1>
       <span id="status" class="status status-bad">Disconnected</span>
     </div>
 
-    <!-- Filters -->
     <div class="filters">
       <label class="filter">
         <span>Time</span>
@@ -39,17 +36,14 @@
       <button type="button" id="refresh" class="btn">Refresh</button>
     </div>
 
-    <!-- Meta -->
     <div class="meta">
       <span id="updated">—</span>
       <span id="mode-label">—</span>
     </div>
   </header>
 
-
-  <!-- ================= BANNERS ================= -->
-  <div id="demo-banner" class="banner banner-demo hidden">
-    Demo mode — using local data. Set <code>useDemo: false</code> in config.js for Elasticsearch.
+  <div id="mock-banner" class="banner banner-mock hidden">
+    Mock mode — sample SPI data. Set <code>useMock: false</code> in config.js for live Elasticsearch.
   </div>
 
   <div id="error" class="banner banner-error hidden" role="alert">
@@ -57,38 +51,29 @@
     <button type="button" id="retry" class="btn btn-inline">Retry</button>
   </div>
 
-  <!-- ================= MAIN ================= -->
   <main class="main">
-
-    <!-- ================= BOARD KPI ================= -->
     <section class="kpi-section">
       <h2 class="section-title">Board KPIs</h2>
 
-      <section class="kpi-row">
-
+      <div class="kpi-row">
         <div class="kpi-card kpi-card-highlight">
           <span class="kpi-label">Boards</span>
           <span id="kpi-board-count" class="kpi-value">—</span>
         </div>
-
         <div class="kpi-card">
           <span class="kpi-label">Pass</span>
           <span id="kpi-board-pass" class="kpi-value kpi-ok">—</span>
         </div>
-
         <div class="kpi-card">
           <span class="kpi-label">Fail</span>
           <span id="kpi-board-fail" class="kpi-value kpi-error">—</span>
         </div>
-
         <div class="kpi-card">
           <span class="kpi-label">Yield</span>
           <span id="kpi-board-yield" class="kpi-value">—</span>
         </div>
+      </div>
 
-      </section>
-
-      <!-- ✅ Board chart -->
       <div class="panel chart-panel">
         <div class="panel-head">
           <h3>Board PASS / FAIL</h3>
@@ -97,35 +82,28 @@
       </div>
     </section>
 
-    <!-- ================= PAD KPI ================= -->
     <section class="kpi-section">
       <h2 class="section-title">Pad KPIs</h2>
 
-      <section class="kpi-row">
-
+      <div class="kpi-row">
         <div class="kpi-card kpi-card-highlight">
           <span class="kpi-label">Pads</span>
           <span id="kpi-pad-count" class="kpi-value">—</span>
         </div>
-
         <div class="kpi-card">
           <span class="kpi-label">Pass</span>
           <span id="kpi-pad-pass" class="kpi-value kpi-ok">—</span>
         </div>
-
         <div class="kpi-card">
           <span class="kpi-label">Fail</span>
           <span id="kpi-pad-fail" class="kpi-value kpi-error">—</span>
         </div>
-
         <div class="kpi-card">
           <span class="kpi-label">Yield</span>
           <span id="kpi-pad-yield" class="kpi-value">—</span>
         </div>
+      </div>
 
-      </section>
-
-      <!-- ✅ Pad chart -->
       <div class="panel chart-panel">
         <div class="panel-head">
           <h3>Pad Result Distribution</h3>
@@ -134,36 +112,53 @@
       </div>
     </section>
 
-    <!-- ================= TABLE ================= -->
-    <section class="panel panel-table">
+    <section id="board-panel" class="panel panel-table">
       <div class="panel-head">
-        <h2>Board Records (Pad-level rows)</h2>
+        <h2>Board Serial Numbers</h2>
+        <span class="panel-hint">Click a serial to view pad inspection data</span>
         <span id="loading-tag" class="loading-tag hidden">Updating…</span>
       </div>
 
       <div class="table-wrap">
         <table>
-          <thead id="thead"></thead>
-          <tbody id="tbody"></tbody>
+          <thead id="board-thead"></thead>
+          <tbody id="board-tbody"></tbody>
         </table>
       </div>
 
       <div class="pager">
-        <button type="button" id="prev" class="btn">Previous</button>
-        <span id="page-info">Page 1 of 1</span>
-        <button type="button" id="next" class="btn">Next</button>
+        <button type="button" id="board-prev" class="btn">Previous</button>
+        <span id="board-page-info">Page 1 of 1</span>
+        <button type="button" id="board-next" class="btn">Next</button>
       </div>
     </section>
 
+    <section id="pad-panel" class="panel panel-table hidden">
+      <div class="panel-head panel-head-split">
+        <div class="panel-head-left">
+          <button type="button" id="back-boards" class="btn btn-back">← Boards</button>
+          <h2>Pads for <span id="pad-serial-label" class="serial-label"></span></h2>
+        </div>
+        <span id="pad-loading-tag" class="loading-tag hidden">Loading…</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead id="pad-thead"></thead>
+          <tbody id="pad-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <button type="button" id="pad-prev" class="btn">Previous</button>
+        <span id="pad-page-info">Page 1 of 1</span>
+        <button type="button" id="pad-next" class="btn">Next</button>
+      </div>
+    </section>
   </main>
 
-
-
-  <!-- ================= SCRIPTS ================= -->
   <script src="config.js"></script>
-  <script src="demo-csv-data.js"></script>
-  <script src="demo-data.js"></script>
+  <script src="mock-es.js"></script>
   <script src="app.js"></script>
-
 </body>
 </html>

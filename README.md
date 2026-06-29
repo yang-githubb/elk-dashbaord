@@ -1,176 +1,80 @@
 # SMT Board Dashboard (ELK)
 
-Factory dashboard for SMT board inspection results. Built with **plain HTML, CSS, and JavaScript** — no Node.js, no build step.
+Factory dashboard for SPI pad-level inspection data from Elasticsearch.
 
-Works in **demo mode** offline with sample data, or connects to **Elasticsearch** for live production data.
+Plain **HTML + CSS + JavaScript** — no Node.js, no build step. Includes a stdlib Python proxy for factory deployment.
 
 ## Quick start
-
-1. Clone the repo:
 
 ```bat
 git clone https://github.com/yang-githubb/elk-dashbaord.git
 cd elk-dashbaord
-```
-
-2. Create your config (first time only):
-
-```bat
 copy config.example.js config.js
+start.bat
 ```
 
-3. Edit `config.js` if using live Elasticsearch (see [Configuration](#configuration)).
+Opens `http://127.0.0.1:8000/` in your browser.
 
-4. **Double-click `start.bat`** to open the dashboard in your browser.
+## Modes
+
+| Mode | Config | When to use |
+|------|--------|-------------|
+| **Mock** | `useMock: true` | Offline dev — 100 sample SPI records, no VPN |
+| **Live** | `useMock: false` | Factory PC on VPN — queries Elasticsearch via proxy |
 
 ## Features
 
-### KPIs
-- Board count
-- Pass / NG / Good counts
-- Yield %
-
-### Filters
-| Filter | Options |
-|--------|---------|
-| **Time** | All time, 15 min, 1 h, 6 h, 24 h, 7 days, 30 days |
-| **Line** | Production line |
-| **Model** | Board / PCB model |
-
-### Pie charts (selected time range)
-- **General pass / NG** — overall Pass vs NG
-- **Model pass / NG / good** — Good / Pass / NG mix
-- **Serial pass / NG / good** — result distribution by board serial
-- **By line pass / NG** — Pass vs NG per line
-
-### Board records table
-Paginated list with date, serial, model, line, pass/NG result, and pad count.
+- **Board KPIs** — distinct `array_barcode` pass/fail (any NG pad = board fail)
+- **Pad KPIs** — GOOD / PASS (includes WARNING) / FAIL (NG) counts
+- **Pie charts** — board and pad result distribution
+- **Filters** — time, line, model (pcb_name)
+- **Table** — paginated pad-level rows (25 per page)
 
 ## Project structure
 
 | File | Purpose |
 |------|---------|
-| `start.bat` | Entry point — launches the dashboard |
+| `start.bat` | Starts `proxy.py` and opens the dashboard |
+| `proxy.py` | Serves static files + `POST /search` → Elasticsearch |
 | `index.html` | Page layout |
-| `styles.css` | Factory-floor styling |
-| `app.js` | Filters, board aggregation, charts, table |
-| `demo-data.js` | Builds demo dataset (synthetic + CSV) |
-| `demo-csv-data.js` | 100 pad records from sample inspection CSV |
+| `styles.css` | Dark factory-floor styling |
+| `app.js` | Filters, ES queries, KPIs, charts, table |
+| `mock-es.js` | Offline mock Elasticsearch client |
 | `config.example.js` | Config template |
-| `config.js` | Your ES credentials (**not in git**) |
-| `508BFD5_*.csv` | Source Koh Young inspection CSV (demo) |
+| `config.js` | Your settings (**gitignored**) |
 
 ## Configuration
 
-Copy `config.example.js` to `config.js`:
-
 ```js
 window.ES_CONFIG = {
-  useDemo: true,                              // false for live Elasticsearch
-  node: "https://your-elasticsearch-host",
-  username: "your-service-user",
-  password: "your-password",
-  index: "your-index-name",
+  useMock: true,           // false for live Elasticsearch
+  proxyUrl: "/search",     // relative when served by proxy.py
+  node: "https://your-es-host",
+  index: "your-index-*",
   fields: {
-    time: "@timestamp",
+    time: "timestamp",
     line: "line",
+    model: "pcb_name",
+    serial: "array_barcode",
     station: "station",
   },
 };
 ```
 
-| Setting | Description |
-|---------|-------------|
-| `useDemo` | `true` = use local demo data; `false` = query Elasticsearch |
-| `node` | Elasticsearch cluster URL |
-| `username` / `password` | Service account (read-only recommended) |
-| `index` | Index name |
-| `fields` | Field names for timestamp, line, and station |
+## Live Elasticsearch (factory)
 
-### Demo mode (default)
+1. Set `useMock: false` in `config.js`
+2. Run `start.bat` (credentials are in `proxy.py`, overridable via `ES_USERNAME` / `ES_PASSWORD` env vars)
 
-- **101 boards** total: 100 synthetic + 1 rolled up from CSV pad data
-- No VPN or network required
-- Status badge shows **Demo**
+## Scaling (500M+ records)
 
-Set `useDemo: false` when on the factory network with Elasticsearch access.
+All KPIs and charts use Elasticsearch **aggregations** (`size: 0`) — counts are computed on the cluster, not in the browser. The table loads 25 rows per page only.
 
-## Live Elasticsearch
-
-### Requirements
-- VPN / network access to the cluster
-- CORS enabled on Elasticsearch (browser calls ES directly)
-
-```yaml
-http.cors.enabled: true
-http.cors.allow-origin: "*"
-http.cors.allow-headers: "Authorization, Content-Type"
-http.cors.allow-credentials: true
-```
-
-### Security
-- Credentials are in `config.js` and visible in browser DevTools
-- Use a **read-only** service account
-- Deploy only on trusted factory PCs or behind an internal web server
-- `config.js` is gitignored — never commit credentials
-
-## Deployment
-
-**Factory PC:** double-click `start.bat`
-
-**Internal web server:** copy the folder to IIS, nginx, or any static file host and open `index.html`.
-
-No `npm install` or compilation required.
-
-## Troubleshooting
-
-| Problem | Likely fix |
-|---------|------------|
-| Blank charts / Disconnected | Turn on demo mode, or check VPN + `config.js` |
-| CORS error in browser console (F12) | Enable CORS on Elasticsearch |
-| Empty Line / Model dropdowns | Update `fields` in `config.js` to match index mapping |
-| `config.js` missing | Run `start.bat` or `copy config.example.js config.js` |
-
-## Handling large datasets (500M+ records)
-
-**Demo mode** only loads ~200 local sample records — for development only.
-
-**Live Elasticsearch mode** is built for large scale:
-
-| What | How | Scales? |
-|------|-----|--------|
-| KPIs & pie charts | Elasticsearch **aggregations** (`size: 0`) — counts computed on cluster | Yes |
-| Board count | `cardinality` on serial field | Yes (approximate on huge sets) |
-| Records table | **25 rows per page** only — never loads full dataset | Yes |
-| Browser | Never receives 500M documents | — |
-
-### What will NOT work at 500M+
-- Loading all records into the browser
-- Client-side rollups (demo mode logic)
-- **All time** queries without filters on huge indices (slow/timeouts)
-- Deep table pagination (page 1,000,000) with `from` + `size`
-
-### Recommendations for production
-1. Set `useDemo: false` and map `fields` in `config.js` to your index
-2. Use **time filters** (24h / 7d) for routine monitoring; avoid **All time** unless indexed/summarized
-3. Ensure `serial`, `line`, `model`, `general`, `result` are **keyword** fields (or `.keyword` subfields)
-4. Prefer **board-level** documents in ES, or a rollup index — pad-level 500M docs will aggregate pad counts, not boards
-5. Use Elasticsearch **index lifecycle** (daily/weekly indices) for time pruning
-6. For very large exports, use ES `_search` / Datafeed / ETL — not this dashboard
-
-### Field mapping (`config.js`)
-
-```js
-fields: {
-  time: "@timestamp",
-  line: "line",
-  model: "model",
-  serial: "board_id",    // used for cardinality (board count)
-  general: "general",    // PASS / NG
-  result: "result",      // GOOD / PASS / NG
-}
-```
+Recommendations:
+- Use time filters (24h / 7d) for routine monitoring
+- Ensure `array_barcode`, `pcb_name`, `line`, `pcb_result` have `.keyword` subfields
+- Board KPI uses composite aggregation on `array_barcode` (cached 3 min)
 
 ## License
 
-Internal factory use. Adjust as needed for your organization.
+Internal factory use.
