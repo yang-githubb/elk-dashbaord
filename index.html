@@ -50,9 +50,7 @@
     </div>
   </header>
 
-  <div id="mock-banner" class="banner banner-mock hidden">
-    Mock mode — sample SPI data. Set <code>useMock: false</code> in config.js for live Elasticsearch.
-  </div>
+  <div id="mock-banner" class="banner banner-mock hidden"></div>
 
   <div id="error" class="banner banner-error hidden" role="alert">
     <span id="error-text"></span>
@@ -165,8 +163,21 @@
     </section>
   </main>
 
+  <!-- Config (order matters) -->
+  <script src="config/profiles.js"></script>
+  <script src="config/environments.js"></script>
+  <script src="config/schema.spi.js"></script>
+  <script src="config/schema.aoi.js"></script>
+  <script src="config/settings.js"></script>
   <script src="config.js"></script>
+  <script src="config/bootstrap.js"></script>
+
+  <!-- Data + app -->
   <script src="mock-es.js"></script>
-  <script src="app.js"></script>
+  <script src="js/config-access.js"></script>
+  <script src="js/es-queries.js"></script>
+  <script src="js/es-client.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

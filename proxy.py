@@ -30,15 +30,22 @@ ES_USERNAME = os.environ.get("ES_USERNAME", "flexh1smtmachinesdata-sac-tst-00589
 ES_PASSWORD = os.environ.get("ES_PASSWORD", "f*oA-4cj")
 SEARCH_URL = f"{ES_URL}/{ES_INDEX}/_search"
 
-# Only these files may be served over HTTP (prevents path traversal)
+# Only these paths may be served over HTTP (prevents path traversal)
 ALLOWED_STATIC = frozenset({
     "index.html",
-    "app.js",
     "mock-es.js",
     "styles.css",
     "config.js",
     "config.example.js",
 })
+
+ALLOWED_PREFIXES = ("config/", "js/")
+
+
+def is_allowed_static(path: str) -> bool:
+    if path in ALLOWED_STATIC:
+        return True
+    return path.endswith(".js") and path.startswith(ALLOWED_PREFIXES)
 
 
 def es_request(body: bytes) -> tuple[int, bytes]:
@@ -72,7 +79,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._serve_file("index.html")
             return
         name = path.lstrip("/")
-        if name in ALLOWED_STATIC:
+        if is_allowed_static(name):
             self._serve_file(name)
             return
         self.send_error(404, f"Not found: {path}")

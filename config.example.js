@@ -1,27 +1,17 @@
 /**
- * Dashboard configuration — copy to config.js and adjust for your environment.
+ * User configuration — copy to config.js and edit.
  *
- * useMock: true  → offline development with sample SPI data (no VPN needed)
- * useMock: false → live Elasticsearch via proxy (python proxy.py)
+ * profile      → key from config/profiles.js   ("mock" | "live")
+ * environment  → key from config/environments.js (when profile is "live")
+ * overrides    → optional tweaks without editing shared config files
  */
-window.ES_CONFIG = {
-  useMock: false,
+window.DASHBOARD_USER_CONFIG = {
+  profile: "mock",
+  environment: "factory-sac",
 
-  // Proxy endpoint (relative URL when served by proxy.py)
-  proxyUrl: "/search",
-
-  // Direct ES access (only if not using proxy)
-  node: "https://elastic-sac-test.elkaas.flex.com",
-  index: "flexh1smtmachinesdata-tan_meng_kiang-*",
-  username: "",
-  password: "",
-
-  // Field mapping — matches factory SPI index schema
-  fields: {
-    time: "timestamp",
-    line: "line",
-    model: "pcb_name",
-    serial: "array_barcode",
-    station: "station",
-  },
+  // overrides: {
+  //   defaultTimeRange: "24h",
+  //   pageSize: 50,
+  //   fields: { model: "pcb_name" },
+  // },
 };
