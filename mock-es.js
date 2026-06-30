@@ -4,7 +4,7 @@
 (function () {
   const MOCK_RECORD_COUNT = 100;
 
-  const SAMPLE_SOURCE = {
+  const SAMPLE_SOURCE_SPI = {
     station: "SPI",
     line: "SMT1",
     machine: "KY8030-2",
@@ -26,6 +26,35 @@
     source_file: "50817A8_260620222329_956-387-10_959-387-10ABOT_DS-404466.csv.processing",
     timestamp: "2026-06-20T14:24:19.075076Z",
   };
+  const SAMPLE_SOURCE_AOI = {
+    "station": "AOI",
+    "line": "SMT1",
+    "machine": "ZENITHLITE",
+    "source_file": "260625191038_A26201350P_20260625191126.csv.processing",
+    "timestamp": "2026-06-25T11:10:40.230536",
+    "barcode": "A26201350P",
+    "result": "PASS",
+    "program_name": "\T_8000-0262-000_REVC4-0_T\T_8000-0262-000_REVC4-0_T.KYJOB",
+    "tester_name": "AP-SX-00192",
+    "repair_operator": "AutoOP",
+    "review_operator_id": "5170575",
+    "test_start_time": "20260625184831",
+    "test_end_time": "20260625184844",
+    "number_of_component_tested": "154",
+    "number_of_false_call": "9",
+    "number_of_repaired_defects": "0",
+    "panel_id": 1,
+    "panel_barcode": "A26201350P",
+    "ref_descrd_name": "U10",
+    "lead": 5,
+    "comp_part_num": "TDN-3130-2992-300",
+    "package_name": "TDN-3130-2992-300",
+    "machine_call": "Coplanarity",
+    "repair_status": "FALSE",
+    "operator_call": "GOOD",
+    "component_barcode": "NA",
+    "format": "inspection"
+    }
 
   const LINES = ["SMT1", "SMT2", "SMT3"];
   const PCB_NAMES = [
