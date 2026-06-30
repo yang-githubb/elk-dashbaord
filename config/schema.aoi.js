@@ -2,7 +2,8 @@
  * AOI component-level inspection schema.
  * Field names aligned with AOI export / ELK documents (see sample CSV).
  *
- * Board header: panel_barcode, result (PASS/FAIL), program_name, machine (tester)
+ * Board header: barcode (50831B6), result (PASS/FAIL), program_name, machine (tester)
+ * panel_id is numeric (1, 2…) — do NOT use for board list / cardinality
  * Component rows: ref_descrd_name, lead, comp_part_no, package_name,
  *                  machine_call, repair_status, operator_call, component_barcode
  */
@@ -23,7 +24,7 @@ window.DASHBOARD_SCHEMAS.AOI = {
     time: "timestamp",
     line: "line",
     model: "program_name",
-    serial: "panel_barcode",
+    serial: "barcode",
     station: "station",
     machine: "machine",
   },
@@ -46,7 +47,7 @@ window.DASHBOARD_SCHEMAS.AOI = {
     pass: [],
     fail: ["FAIL", "NG"],
 
-    serialField: "panel_barcode.keyword",
+    serialField: "barcode.keyword",
     boardCountField: "ref_descrd_name",
     boardCountAgg: "cardinality",
   },
@@ -58,7 +59,7 @@ window.DASHBOARD_SCHEMAS.AOI = {
   ],
 
   boardColumns: [
-    { key: "serial", label: "Panel Barcode" },
+    { key: "serial", label: "Panel Barcode", type: "serial" },
     { key: "model", label: "Program" },
     { key: "machine", label: "Tester" },
     { key: "line", label: "Line" },
@@ -90,6 +91,7 @@ window.DASHBOARD_SCHEMAS.AOI = {
     "operator_call",
     "component_barcode",
     "program_name",
+    "barcode",
     "panel_barcode",
     "machine",
     "line",

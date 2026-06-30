@@ -37,7 +37,7 @@ window.DASHBOARD_SCHEMAS.SPI = {
   },
 
   boardColumns: [
-    { key: "serial", label: "Serial" },
+    { key: "serial", label: "Serial", type: "serial" },
     { key: "model", label: "PCB Name" },
     { key: "line", label: "Line" },
     { key: "timestamp", label: "Last Inspection", type: "time" },

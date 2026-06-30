@@ -8,6 +8,17 @@
     return String(value);
   }
 
+  function formatCount(value) {
+    const n = Number(value);
+    if (Number.isNaN(n)) return cellValue(value);
+    return n.toLocaleString();
+  }
+
+  function formatSerial(value) {
+    if (value == null) return "—";
+    return String(value);
+  }
+
   function formatNumber(value) {
     const n = Number(value);
     if (Number.isNaN(n)) return cellValue(value);
@@ -27,6 +38,7 @@
 
   function formatTableCell(col, raw) {
     if (raw == null) return "—";
+    if (col.type === "serial") return formatSerial(raw);
     if (col.type === "bool") return raw ? "Yes" : "No";
     if (col.type === "number") return formatNumber(raw);
     if (col.type === "time") return formatTime(raw);
@@ -60,7 +72,7 @@
     const legend = items
       .map((i) => {
         const p = ((i.count / total) * 100).toFixed(2);
-        return `<li><span class="legend-dot" style="background:${i.color}"></span>${i.label} <strong>${i.count}</strong> (${p}%)</li>`;
+        return `<li><span class="legend-dot" style="background:${i.color}"></span>${i.label} <strong>${formatCount(i.count)}</strong> (${p}%)</li>`;
       })
       .join("");
 
@@ -145,7 +157,7 @@
       const refresh = (D.config.refreshMs || 120000) / 1000;
       const prefix = this._modePrefix || `${D.config.environmentLabel || D.config.environment} · ${D.config.schemaLabel || D.state.station}`;
       const detailLabel = this._detailCountLabel || D.getDetailCountLabel();
-      this.setText("mode-label", `${prefix} · ${boardCount} boards · ${padCount} ${detailLabel} · ${range} · refresh ${refresh}s`);
+      this.setText("mode-label", `${prefix} · ${formatCount(boardCount)} boards · ${formatCount(padCount)} ${detailLabel} · ${range} · refresh ${refresh}s`);
     },
 
     updateBoardPager() {
@@ -199,7 +211,7 @@
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "serial-link";
-            btn.textContent = cellValue(raw);
+            btn.textContent = formatSerial(raw);
             btn.addEventListener("click", (e) => {
               e.stopPropagation();
               options.onSerialClick(raw);
@@ -279,7 +291,7 @@
       const latest = bucket.latest?.value;
       const topResult = bucket.top_result?.buckets?.[0]?.key;
       return {
-        serial: bucket.key.board,
+        serial: formatSerial(bucket.key.board),
         model: bucket.top_model?.buckets?.[0]?.key ?? null,
         line: bucket.top_line?.buckets?.[0]?.key ?? null,
         machine: bucket.top_machine?.buckets?.[0]?.key ?? null,
