@@ -95,7 +95,7 @@
       if (f.term?.["line.keyword"] && source.line !== f.term["line.keyword"]) return false;
       if (f.term?.["pcb_name.keyword"] && source.pcb_name !== f.term["pcb_name.keyword"]) return false;
       if (f.term?.["station.keyword"] && source.station !== f.term["station.keyword"]) return false;
-      if (f.term?.["array_barcode.keyword"] && source.array_barcode !== f.term["array_barcode.keyword"]) return false;
+      if (f.term?.[serialField ] && source.array_barcode !== f.term[serialField]) return false;
     }
     return true;
   }

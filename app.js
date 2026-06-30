@@ -9,7 +9,6 @@
 // Constants
 // ---------------------------------------------------------------------------
 
-const STATION = "SPI";
 const BOARD_CACHE_MS = 180_000;
 const REFRESH_MS = 120_000;
 const HEALTH_MS = 60_000;
@@ -86,6 +85,7 @@ const state = {
   time: "all",
   line: "",
   model: "",
+  station: "SPI",   // ✅ NEW
   view: "boards",
   selectedSerial: null,
   boardPage: 0,
@@ -104,6 +104,22 @@ let boardKpiTs = 0;
 // Config helpers
 // ---------------------------------------------------------------------------
 
+function getSchema() {
+  if (state.station === "AOI") {
+    return {
+      serial: "panel_barcode",
+      result: "result",
+      isPad: false,
+    };
+  }
+
+  return {
+    serial: "array_barcode",
+    result: "pcb_result",
+    isPad: true,
+  };
+}
+
 function cfg() {
   return window.ES_CONFIG ?? {};
 }
@@ -113,11 +129,12 @@ function useMock() {
 }
 
 function getFields() {
+  const schema = getSchema();
   const defaults = {
     time: "timestamp",
     line: "line",
     model: "pcb_name",
-    serial: "array_barcode",
+    serial: schema.serial, 
     station: "station",
   };
   return { ...defaults, ...(cfg().fields ?? {}) };
@@ -148,7 +165,7 @@ function buildEsFilters() {
   if (state.model) {
     filters.push({ term: { [esField(fields.model)]: state.model } });
   }
-  filters.push({ term: { [esField(fields.station)]: STATION } });
+  filters.push({ term: { [esField(fields.station)]: state.station } });
 
   return filters;
 }
@@ -163,17 +180,33 @@ function buildEsQuery(filters) {
 }
 
 function buildDashboardAggs() {
+  const schema = getSchema();
+  const resultField = `${schema.result}.keyword`;
+
+  const failValues = state.station === "AOI"
+    ? ["FAIL"]        // ✅ AOI
+    : ["NG"];         // ✅ SPI
+
+  const passValues = state.station === "AOI"
+    ? ["PASS"]
+    : ["PASS", "WARNING"];
+
   return {
-    total_count: { value_count: { field: "pcb_result.keyword" } },
-    total_boards: { cardinality: { field: "array_barcode.keyword" } },
-    count_good: { filter: { term: { "pcb_result.keyword": "GOOD" } } },
-    count_pass: { filter: { terms: { "pcb_result.keyword": ["PASS", "WARNING"] } } },
-    count_fail: { filter: { term: { "pcb_result.keyword": "NG" } } },
+    total_count: { value_count: { field: resultField } },
+    total_boards: { cardinality: { field: getFields().serial + ".keyword" } },
+
+    count_good: { filter: { term: { [resultField]: "GOOD" } } },
+    count_pass: { filter: { terms: { [resultField]: passValues } } },
+    count_fail: { filter: { terms: { [resultField]: failValues } } },
   };
 }
 
 /** KPI composite — walks all boards in pages of 5000. */
 function buildBoardKpiAgg(afterKey = null) {
+  const serialField = getFields().serial + ".keyword";
+  const schema = getSchema();
+  const resultField = `${schema.result}.keyword`;
+  const failValue = state.station === "AOI" ? "FAIL" : "NG";
   const agg = {
     size: 0,
     query: buildEsQuery(buildEsFilters()),
@@ -181,10 +214,12 @@ function buildBoardKpiAgg(afterKey = null) {
       boards: {
         composite: {
           size: COMPOSITE_PAGE_SIZE,
-          sources: [{ board: { terms: { field: "array_barcode.keyword" } } }],
+          sources: [{ board: { terms: { field: serialField } } }],
         },
         aggs: {
-          has_ng: { filter: { term: { "pcb_result.keyword": "NG" } } },
+          has_ng: {
+            filter: { term: { [resultField]: failValue } }
+          }
         },
       },
     },
@@ -195,7 +230,11 @@ function buildBoardKpiAgg(afterKey = null) {
 
 /** Board list table — one composite page (25 boards). */
 function buildBoardListAgg(afterKey = null) {
+  const serialField = getFields().serial + ".keyword";
+  const schema = getSchema();
+  const resultField = `${schema.result}.keyword`;
   const fields = getFields();
+  const failValue = state.station === "AOI" ? "FAIL" : "NG";
   const agg = {
     size: 0,
     query: buildEsQuery(buildEsFilters()),
@@ -203,14 +242,18 @@ function buildBoardListAgg(afterKey = null) {
       boards: {
         composite: {
           size: PAGE_SIZE,
-          sources: [{ board: { terms: { field: "array_barcode.keyword" } } }],
+          sources: [{ board: { terms: { field: serialField } } }],
         },
         aggs: {
           latest: { max: { field: fields.time } },
           top_line: { terms: { field: esField(fields.line), size: 1 } },
           top_model: { terms: { field: esField(fields.model), size: 1 } },
-          pad_count: { value_count: { field: "pad_no" } },
-          has_ng: { filter: { term: { "pcb_result.keyword": "NG" } } },
+          pad_count: state.station === "SPI"
+            ? { value_count: { field: "pad_no" } }
+            : { value_count: { field: "_index" } },
+          has_ng: {
+            filter: { term: { [resultField]: failValue } }
+          },
         },
       },
     },
@@ -225,9 +268,12 @@ function buildBoardListAgg(afterKey = null) {
 
 function normalizePcbResult(value) {
   const v = String(value || "").toUpperCase();
+
   if (v === "GOOD") return "GOOD";
   if (v === "PASS" || v === "WARNING") return "PASS";
-  if (v === "NG") return "FAIL";
+
+  if (v === "NG" || v === "FAIL") return "FAIL"; // ✅ AOI fix
+
   return "PASS";
 }
 
@@ -738,6 +784,11 @@ async function loadPads(page = 0, signal) {
 
 async function loadDashboard(silent = false) {
   if (!silent) setLoading(true);
+  
+  if (state.station === "AOI") {
+    $("pad-panel").classList.add("hidden");
+  }
+
   hideError();
 
   state.abort?.abort();
@@ -817,6 +868,9 @@ async function checkHealth() {
 
 function openPadView(serial) {
   if (!serial) return;
+  
+  if (state.station === "AOI") return; 
+
   showPadView(serial);
   resetPadPaging();
   loadDashboard();
@@ -833,6 +887,7 @@ function onFilterChange() {
   state.time = $("time").value;
   state.line = $("line").value;
   state.model = $("model").value;
+  state.station = $("station").value;
   state.selectedSerial = null;
   resetBoardPaging();
   resetPadPaging();
