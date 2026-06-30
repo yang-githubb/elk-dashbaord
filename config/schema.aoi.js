@@ -1,8 +1,8 @@
 /**
  * AOI component-level inspection schema.
  *
- * Unified ELK index stores the panel barcode in array_barcode (same as SPI).
- * panel_barcode / barcode are fallbacks. panel_id is numeric — never group on it.
+ * AOI uses panel_barcode / barcode (e.g. 50831B6) — NOT array_barcode (SPI only).
+ * panel_id is numeric (1, 2, 3…) — never use for grouping.
  */
 window.DASHBOARD_SCHEMAS = window.DASHBOARD_SCHEMAS || {};
 
@@ -21,7 +21,7 @@ window.DASHBOARD_SCHEMAS.AOI = {
     time: "timestamp",
     line: "line",
     model: "program_name",
-    serial: "array_barcode",
+    serial: "panel_barcode",
     station: "station",
     machine: "tester_name",
   },
@@ -36,16 +36,16 @@ window.DASHBOARD_SCHEMAS.AOI = {
   kpi: {
     boardResultField: "result.keyword",
     boardFail: ["FAIL"],
+    requireSerialField: "panel_barcode",
     excludeEmptySerial: true,
-    excludeLeadingUnderscoreSource: true,
 
     componentResultField: "operator_call.keyword",
     good: ["GOOD"],
     pass: [],
     fail: ["FAIL", "NG"],
 
-    serialField: "array_barcode.keyword",
-    serialSourceFields: ["array_barcode", "panel_barcode", "barcode", "source_file"],
+    serialField: "panel_barcode.keyword",
+    serialSourceFields: ["panel_barcode", "barcode", "source_file"],
     boardCountField: "ref_descrd_name",
     boardCountAgg: "cardinality",
   },
@@ -89,7 +89,6 @@ window.DASHBOARD_SCHEMAS.AOI = {
     "operator_call",
     "component_barcode",
     "program_name",
-    "array_barcode",
     "panel_barcode",
     "barcode",
     "tester_name",

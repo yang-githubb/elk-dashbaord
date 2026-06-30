@@ -290,22 +290,23 @@
     barcodeFromPath(path) {
       if (!path) return null;
       const s = String(path).replace(/^\//, "");
-      const m = s.match(/^([A-Za-z0-9]+)_\d{14}/);
-      return m?.[1] ?? null;
+      // SPI: BARCODE_YYYYMMDDHHMMSS_...
+      const lead = s.match(/^([A-Za-z0-9]+)_\d{14}/);
+      if (lead) return lead[1];
+      // AOI: YYYYMMDDHHMMSS_BARCODE_YYYYMMDDHHMMSS...
+      const mid = s.match(/^\d{14}_([A-Za-z0-9]+)_\d{14}/);
+      return mid?.[1] ?? null;
     },
 
     resolveBoardSerial(bucket) {
-      const fields = D.getFields();
+      const kpi = D.getKpi();
       const hit = bucket.top_serial?.hits?.hits?.[0];
       const src = hit?._source ?? {};
 
-      const candidates = [
-        src.array_barcode,
-        src.panel_barcode,
-        src.barcode,
-        src[fields.serial],
-      ];
-      for (const value of candidates) {
+      const sourceKeys = kpi.serialSourceFields || [D.getFields().serial, "barcode"];
+      for (const key of sourceKeys) {
+        if (key === "source_file") continue;
+        const value = src[key];
         if (value != null && String(value).trim()) return formatSerial(value);
       }
 
