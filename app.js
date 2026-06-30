@@ -424,7 +424,7 @@ function pieHtml(counts, keys, labels, size = "md") {
   const legend = items
     .map((i) => {
       const p = ((i.count / total) * 100).toFixed(2);
-      return `<li><span class="legend-dot" style="background:${i.color}"></span>${i.label} <strong>${i.count}</strong> (${p}%)</li>`;
+      return `<li><span class="legend-dot" style="background:${i.color}"></span>${i.label} <strong>${i.count.toLocaleString()}</strong> (${p}%)</li>`;
     })
     .join("");
 
