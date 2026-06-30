@@ -16,8 +16,17 @@
       if (D.state.line) filters.push({ term: { [D.esField(fields.line)]: D.state.line } });
       if (D.state.model) filters.push({ term: { [D.esField(fields.model)]: D.state.model } });
       filters.push({ term: { [D.esField(fields.station)]: D.state.station } });
-      const requireSerial = D.getKpi().requireSerialField;
-      if (requireSerial) filters.push({ exists: { field: requireSerial } });
+
+      const kpi = D.getKpi();
+      if (kpi.requireSerialField) {
+        filters.push({ exists: { field: kpi.requireSerialField } });
+      }
+      if (kpi.excludeEmptySerial !== false && kpi.serialField) {
+        filters.push({ bool: { must_not: [{ term: { [kpi.serialField]: "" } }] } });
+      }
+      if (kpi.excludeLeadingUnderscoreSource) {
+        filters.push({ bool: { must_not: [{ prefix: { "source_file.keyword": "_" } }] } });
+      }
       return filters;
     },
 

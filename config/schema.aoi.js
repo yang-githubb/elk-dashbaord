@@ -1,10 +1,8 @@
 /**
  * AOI component-level inspection schema.
- * Field names from AOI ELK documents (see sample CSV + SAMPLE_SOURCE_AOI).
  *
- * panel_barcode = "50831B6" (string) — use for board list / cardinality
- * panel_id = 1, 2, 3… (number) — do NOT use for grouping
- * barcode may duplicate panel_barcode or be absent on some rows
+ * Unified ELK index stores the panel barcode in array_barcode (same as SPI).
+ * panel_barcode / barcode are fallbacks. panel_id is numeric — never group on it.
  */
 window.DASHBOARD_SCHEMAS = window.DASHBOARD_SCHEMAS || {};
 
@@ -23,7 +21,7 @@ window.DASHBOARD_SCHEMAS.AOI = {
     time: "timestamp",
     line: "line",
     model: "program_name",
-    serial: "panel_barcode",
+    serial: "array_barcode",
     station: "station",
     machine: "tester_name",
   },
@@ -38,15 +36,16 @@ window.DASHBOARD_SCHEMAS.AOI = {
   kpi: {
     boardResultField: "result.keyword",
     boardFail: ["FAIL"],
-    requireSerialField: "panel_barcode",
+    excludeEmptySerial: true,
+    excludeLeadingUnderscoreSource: true,
 
     componentResultField: "operator_call.keyword",
     good: ["GOOD"],
     pass: [],
     fail: ["FAIL", "NG"],
 
-    serialField: "panel_barcode.keyword",
-    serialSourceFields: ["panel_barcode", "barcode", "source_file"],
+    serialField: "array_barcode.keyword",
+    serialSourceFields: ["array_barcode", "panel_barcode", "barcode", "source_file"],
     boardCountField: "ref_descrd_name",
     boardCountAgg: "cardinality",
   },
@@ -90,6 +89,7 @@ window.DASHBOARD_SCHEMAS.AOI = {
     "operator_call",
     "component_barcode",
     "program_name",
+    "array_barcode",
     "panel_barcode",
     "barcode",
     "tester_name",

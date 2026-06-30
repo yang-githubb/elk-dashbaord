@@ -287,28 +287,37 @@
   };
 
   D.transform = {
-    barcodeFromSourceFile(path) {
+    barcodeFromPath(path) {
       if (!path) return null;
-      const m = String(path).match(/_([A-Za-z0-9]+)_\d{14}\./);
+      const s = String(path).replace(/^\//, "");
+      const m = s.match(/^([A-Za-z0-9]+)_\d{14}/);
       return m?.[1] ?? null;
     },
 
     resolveBoardSerial(bucket) {
       const fields = D.getFields();
-      const hit = bucket.top_serial?.hits?.hits?.[0]?._source;
-      if (hit) {
-        const fromDoc = hit.panel_barcode ?? hit.barcode ?? hit[fields.serial];
-        if (fromDoc != null && String(fromDoc).trim()) return formatSerial(fromDoc);
-        const fromFile = D.transform.barcodeFromSourceFile(hit.source_file);
-        if (fromFile) return fromFile;
+      const hit = bucket.top_serial?.hits?.hits?.[0];
+      const src = hit?._source ?? {};
+
+      const candidates = [
+        src.array_barcode,
+        src.panel_barcode,
+        src.barcode,
+        src[fields.serial],
+      ];
+      for (const value of candidates) {
+        if (value != null && String(value).trim()) return formatSerial(value);
       }
 
+      const fromFile = D.transform.barcodeFromPath(src.source_file);
+      if (fromFile) return fromFile;
+
+      const fromId = D.transform.barcodeFromPath(hit?._id);
+      if (fromId) return fromId;
+
       const key = bucket.key?.board;
-      if (key == null || key === "") return "—";
-      const keyStr = String(key);
-      // Small integers are panel_id, not barcodes — hide unless we have no top_hit
-      if (/^\d{1,4}$/.test(keyStr) && !hit) return "—";
-      return formatSerial(key);
+      if (key != null && String(key).trim()) return formatSerial(key);
+      return "—";
     },
 
     boardBucketToRow(bucket) {

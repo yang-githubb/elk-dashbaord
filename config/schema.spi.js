@@ -32,6 +32,9 @@ window.DASHBOARD_SCHEMAS.SPI = {
     pass: ["PASS", "WARNING"],
     fail: ["NG"],
     serialField: "array_barcode.keyword",
+    serialSourceFields: ["array_barcode", "panel_barcode", "barcode", "source_file"],
+    excludeEmptySerial: true,
+    excludeLeadingUnderscoreSource: true,
     resultField: "pcb_result.keyword",
     boardCountField: "pad_no",
   },
@@ -65,6 +68,6 @@ window.DASHBOARD_SCHEMAS.SPI = {
   padSourceFields: [
     "timestamp", "pcb_name", "line", "station", "machine",
     "component_id", "pad_no", "volume", "height", "area", "offset_x", "offset_y",
-    "is_defect", "inspection_date",
+    "is_defect", "inspection_date", "array_barcode", "source_file",
   ],
 };
