@@ -35,7 +35,6 @@ ALLOWED_STATIC = frozenset({
     "index.html",
     "styles.css",
     "config.js",
-    "config.example.js",
 })
 
 ALLOWED_PREFIXES = ("config/", "js/")
