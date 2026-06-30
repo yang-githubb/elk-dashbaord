@@ -131,13 +131,21 @@
       $("pad-panel").classList.remove("hidden");
     },
 
+    updateStationLabels() {
+      const detailLabel = D.getDetailCountLabel();
+      const mode = D.config.environmentLabel || D.config.environment;
+      const station = D.config.schemaLabel || D.state.station;
+      this._modePrefix = `${mode} · ${station}`;
+      this._detailCountLabel = detailLabel;
+    },
+
     updateModeLabel(padCount, boardCount) {
       const labels = D.getTimeLabels();
       const range = labels[D.state.time] || D.state.time;
       const refresh = (D.config.refreshMs || 120000) / 1000;
-      const mode = D.config.environmentLabel || D.config.environment;
-      const station = D.config.schemaLabel || D.state.station;
-      this.setText("mode-label", `${mode} · ${station} · ${boardCount} boards · ${padCount} pads · ${range} · refresh ${refresh}s`);
+      const prefix = this._modePrefix || `${D.config.environmentLabel || D.config.environment} · ${D.config.schemaLabel || D.state.station}`;
+      const detailLabel = this._detailCountLabel || D.getDetailCountLabel();
+      this.setText("mode-label", `${prefix} · ${boardCount} boards · ${padCount} ${detailLabel} · ${range} · refresh ${refresh}s`);
     },
 
     updateBoardPager() {
@@ -224,7 +232,7 @@
 
     renderPadTable(rows) {
       this.renderDataTable("pad-thead", "pad-tbody", D.getPadColumns(), rows, {
-        emptyText: "No pads found for this serial.",
+        emptyText: `No ${D.getDetailCountLabel()} found for this panel.`,
       });
     },
 
@@ -269,13 +277,15 @@
     boardBucketToRow(bucket) {
       const hasNg = (bucket.has_ng?.doc_count ?? 0) > 0;
       const latest = bucket.latest?.value;
+      const topResult = bucket.top_result?.buckets?.[0]?.key;
       return {
         serial: bucket.key.board,
         model: bucket.top_model?.buckets?.[0]?.key ?? null,
         line: bucket.top_line?.buckets?.[0]?.key ?? null,
+        machine: bucket.top_machine?.buckets?.[0]?.key ?? null,
         timestamp: latest != null ? (typeof latest === "number" ? new Date(latest).toISOString() : latest) : null,
         pad_count: bucket.pad_count?.value ?? bucket.doc_count ?? 0,
-        result: hasNg ? "FAIL" : "PASS",
+        result: topResult != null ? D.normalizeResult(topResult) : hasNg ? "FAIL" : "PASS",
       };
     },
 
@@ -283,22 +293,15 @@
       const fields = D.getFields();
       const s = hit._source ?? {};
       const ts = s[fields.time] ?? s.timestamp;
-      return {
-        timestamp: ts ?? null,
-        model: s[fields.model] ?? s.pcb_name ?? null,
-        line: s.line ?? null,
-        station: s.station ?? null,
-        machine: s.machine ?? null,
-        component_id: s.component_id ?? null,
-        pad_no: s.pad_no ?? null,
-        volume: s.volume ?? null,
-        height: s.height ?? null,
-        area: s.area ?? null,
-        offset_x: s.offset_x ?? null,
-        offset_y: s.offset_y ?? null,
-        is_defect: s.is_defect ?? null,
-        inspection_date: s.inspection_date ?? null,
-      };
+      const row = { timestamp: ts ?? null };
+
+      for (const col of D.getPadColumns()) {
+        if (col.key === "timestamp") continue;
+        const srcKey = col.source || col.key;
+        row[col.key] = s[srcKey] ?? null;
+      }
+
+      return row;
     },
   };
 })(window.Dashboard);

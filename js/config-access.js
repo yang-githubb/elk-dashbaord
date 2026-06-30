@@ -11,6 +11,11 @@
   D.getBoardColumns = () => cfg().boardColumns || [];
   D.getPadColumns = () => cfg().padColumns || [];
   D.getPadSourceFields = () => cfg().padSourceFields || [];
+  D.getDetailSort = () => cfg().detailSort || null;
+  D.getBoardHint = () => cfg().boardHint || "Click a serial to view inspection data";
+  D.getDetailTitle = () => cfg().detailTitle || "Inspections for";
+  D.getDetailCountLabel = () => cfg().detailCountLabel || "records";
+  D.getKpiDetailLabel = () => cfg().kpiDetailLabel || "Pad";
   D.getResultColors = () => cfg().resultColors || {};
   D.getTimeLabels = () => cfg().timeLabels || {};
   D.getTimeOrder = () => cfg().timeOrder || [];

@@ -7,6 +7,11 @@ window.DASHBOARD_SCHEMAS.SPI = {
   station: "SPI",
   isPadLevel: true,
 
+  boardHint: "Click a serial to view pad inspection data",
+  detailTitle: "Pads for",
+  detailCountLabel: "pads",
+  kpiDetailLabel: "Pad",
+
   fields: {
     time: "timestamp",
     line: "line",
@@ -42,7 +47,7 @@ window.DASHBOARD_SCHEMAS.SPI = {
 
   padColumns: [
     { key: "timestamp", label: "Timestamp", type: "time" },
-    { key: "model", label: "PCB Name" },
+    { key: "model", label: "PCB Name", source: "pcb_name" },
     { key: "line", label: "Line" },
     { key: "station", label: "Station" },
     { key: "machine", label: "Machine" },

@@ -30,7 +30,7 @@
 
     buildDashboardAggs() {
       const kpi = D.getKpi();
-      const rf = kpi.resultField || "pcb_result.keyword";
+      const rf = kpi.componentResultField || kpi.resultField || "pcb_result.keyword";
       return {
         total_count: { value_count: { field: rf } },
         total_boards: { cardinality: { field: kpi.serialField || "array_barcode.keyword" } },
@@ -40,9 +40,20 @@
       };
     },
 
+    boardResultField() {
+      const kpi = D.getKpi();
+      return kpi.boardResultField || kpi.resultField || "pcb_result.keyword";
+    },
+
+    boardFailValues() {
+      const kpi = D.getKpi();
+      return kpi.boardFail || kpi.fail || ["NG"];
+    },
+
     buildBoardKpiAgg(afterKey = null) {
       const kpi = D.getKpi();
-      const rf = kpi.resultField || "pcb_result.keyword";
+      const rf = this.boardResultField();
+      const failValues = this.boardFailValues();
       const agg = {
         size: 0,
         query: this.buildEsQuery(this.buildEsFilters()),
@@ -53,7 +64,7 @@
               sources: [{ board: { terms: { field: kpi.serialField || "array_barcode.keyword" } } }],
             },
             aggs: {
-              has_ng: { filter: { terms: { [rf]: kpi.fail || ["NG"] } } },
+              has_ng: { filter: { terms: { [rf]: failValues } } },
             },
           },
         },
@@ -65,8 +76,26 @@
     buildBoardListAgg(afterKey = null) {
       const fields = D.getFields();
       const kpi = D.getKpi();
-      const rf = kpi.resultField || "pcb_result.keyword";
+      const rf = this.boardResultField();
+      const failValues = this.boardFailValues();
       const countField = kpi.boardCountField || "pad_no";
+      const countAgg =
+        kpi.boardCountAgg === "cardinality"
+          ? { cardinality: { field: D.esField(countField) } }
+          : { value_count: { field: countField } };
+
+      const boardAggs = {
+        latest: { max: { field: fields.time } },
+        top_line: { terms: { field: D.esField(fields.line), size: 1 } },
+        top_model: { terms: { field: D.esField(fields.model), size: 1 } },
+        pad_count: countAgg,
+        has_ng: { filter: { terms: { [rf]: failValues } } },
+        top_result: { terms: { field: rf, size: 1 } },
+      };
+
+      if (fields.machine) {
+        boardAggs.top_machine = { terms: { field: D.esField(fields.machine), size: 1 } };
+      }
 
       const agg = {
         size: 0,
@@ -77,13 +106,7 @@
               size: D.config.pageSize,
               sources: [{ board: { terms: { field: kpi.serialField || "array_barcode.keyword" } } }],
             },
-            aggs: {
-              latest: { max: { field: fields.time } },
-              top_line: { terms: { field: D.esField(fields.line), size: 1 } },
-              top_model: { terms: { field: D.esField(fields.model), size: 1 } },
-              pad_count: { value_count: { field: countField } },
-              has_ng: { filter: { terms: { [rf]: kpi.fail || ["NG"] } } },
-            },
+            aggs: boardAggs,
           },
         },
       };

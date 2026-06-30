@@ -22,6 +22,7 @@
 
   D.applyStationSchema(D.state.station);
   ui.$("station").value = D.state.station;
+  ui.updateStationLabels();
   updatePadPanelVisibility();
 
   let boardKpiCache = null;
@@ -29,11 +30,21 @@
 
   function updatePadPanelVisibility() {
     const hint = document.querySelector("#board-panel .panel-hint");
-    if (hint) {
-      hint.textContent = D.isPadLevel()
-        ? "Click a serial to view pad inspection data"
-        : "AOI — board list only (no pad drill-down)";
+    if (hint) hint.textContent = D.getBoardHint();
+
+    const detailHeading = document.querySelector("#pad-detail-heading");
+    if (detailHeading) {
+      detailHeading.innerHTML = `${D.getDetailTitle()} <span id="pad-serial-label" class="serial-label"></span>`;
     }
+
+    const kpiDetailTitle = document.querySelector("#kpi-detail-section .section-title");
+    if (kpiDetailTitle) kpiDetailTitle.textContent = `${D.getKpiDetailLabel()} KPIs`;
+
+    const kpiDetailChart = document.querySelector("#kpi-detail-section .panel-head h3");
+    if (kpiDetailChart) {
+      kpiDetailChart.textContent = `${D.getKpiDetailLabel()} Result Distribution`;
+    }
+
     if (!D.isPadLevel()) {
       ui.$("pad-panel")?.classList.add("hidden");
     }
@@ -153,7 +164,7 @@
         from: page * D.config.pageSize,
         size: D.config.pageSize,
         track_total_hits: true,
-        sort: [{ [fields.time]: { order: "desc" } }, { pad_no: { order: "asc" } }],
+        sort: D.getDetailSort() || [{ [fields.time]: { order: "desc" } }, { pad_no: { order: "asc" } }],
         query: esQueries.buildEsQuery(esQueries.buildPadFilters(serial)),
         _source: D.getPadSourceFields(),
       },
@@ -267,6 +278,7 @@
     if (newStation !== D.state.station) {
       D.state.station = newStation;
       D.applyStationSchema(newStation);
+      ui.updateStationLabels();
       updatePadPanelVisibility();
     }
 
