@@ -1,6 +1,5 @@
 /**
- * Elasticsearch cluster definitions — used when profile is "live".
- * Pick one in config.js via `environment`.
+ * Elasticsearch cluster definitions — pick one in config.js via `environment`.
  *
  * Proxy credentials live in proxy.py (or ES_USERNAME / ES_PASSWORD env vars).
  * Keep node/index here in sync with proxy when using proxyUrl.

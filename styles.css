@@ -156,20 +156,6 @@ body {
   gap: 12px;
 }
 
-.banner-mock {
-  background: rgba(245, 158, 11, 0.1);
-  color: #fcd34d;
-  font-size: 0.85rem;
-}
-
-.banner-mock code {
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 1px 5px;
-  border-radius: 3px;
-}
-
 .btn-inline {
   height: 32px;
   min-width: auto;

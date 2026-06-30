@@ -33,7 +33,6 @@ SEARCH_URL = f"{ES_URL}/{ES_INDEX}/_search"
 # Only these paths may be served over HTTP (prevents path traversal)
 ALLOWED_STATIC = frozenset({
     "index.html",
-    "mock-es.js",
     "styles.css",
     "config.js",
     "config.example.js",
@@ -99,7 +98,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             reason = err.reason if hasattr(err, "reason") else str(err)
             msg = json.dumps({
                 "error": f"Cannot reach Elasticsearch: {reason}",
-                "hint": "Check VPN/network and ES_URL, or set useMock: true in config.js",
+                "hint": "Check VPN/network and ES_URL in proxy.py",
                 "target": SEARCH_URL,
             }).encode()
             print(f"[proxy] ES connection failed: {reason}")

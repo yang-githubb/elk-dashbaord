@@ -33,8 +33,6 @@
     proxyBaseUrl,
 
     async search(body, signal) {
-      if (D.useMock()) return window.mockEsSearch(body);
-
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), cfg().fetchTimeoutMs);
       const onAbort = () => controller.abort();

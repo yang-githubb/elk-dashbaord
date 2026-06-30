@@ -1,8 +1,8 @@
 # SMT Board Dashboard (ELK)
 
-Factory dashboard for SPI pad-level inspection data from Elasticsearch.
+Factory dashboard for SPI/AOI inspection data from Elasticsearch.
 
-Plain **HTML + CSS + JavaScript** — no build step. Modular config for mock vs live data and multiple ELK clusters.
+Plain **HTML + CSS + JavaScript** — no build step. Modular config for ELK clusters and station schemas.
 
 ## Quick start
 
@@ -11,29 +11,25 @@ copy config.example.js config.js
 start.bat
 ```
 
-## Switch mock vs live
+Opens http://127.0.0.1:8000/ and connects to Elasticsearch via `proxy.py` (credentials in `proxy.py` or `ES_USERNAME` / `ES_PASSWORD` env vars). Requires factory VPN when using the default cluster.
+
+## Configuration
 
 Edit **only** `config.js`:
 
 ```js
 window.DASHBOARD_USER_CONFIG = {
-  profile: "mock",           // "mock" | "live"  → see config/profiles.js
-  environment: "factory-sac", // used when profile is "live" → config/environments.js
+  environment: "factory-sac",  // → config/environments.js
 };
 ```
-
-| profile | Data source |
-|---------|-------------|
-| `mock` | Local sample data (`mock-es.js`) — no VPN |
-| `live` | Elasticsearch via `proxy.py` |
 
 ## Project structure
 
 ```
 config/
-  profiles.js       ← mock vs live profiles
   environments.js   ← ELK cluster URLs + index patterns
-  schema.spi.js     ← field mappings, table columns, KPI rules
+  schema.spi.js     ← SPI field mappings, table columns, KPI rules
+  schema.aoi.js     ← AOI field mappings (board list only)
   settings.js       ← refresh interval, page size, time ranges
   bootstrap.js      ← merges everything into Dashboard.config
 config.js           ← YOUR picks (gitignored)
@@ -43,7 +39,6 @@ js/
   es-client.js      ← HTTP client / proxy
   ui.js             ← charts, tables, DOM
   app.js            ← main app logic
-mock-es.js          ← offline demo data engine
 proxy.py            ← static server + ELK proxy
 ```
 
@@ -66,7 +61,6 @@ Then set `environment: "my-cluster"` in `config.js`.
 
 ```js
 window.DASHBOARD_USER_CONFIG = {
-  profile: "live",
   environment: "factory-sac",
   overrides: {
     defaultTimeRange: "24h",
@@ -74,11 +68,6 @@ window.DASHBOARD_USER_CONFIG = {
   },
 };
 ```
-
-## Live Elasticsearch
-
-1. `profile: "live"` in `config.js`
-2. Run `start.bat` (credentials in `proxy.py`)
 
 ## License
 

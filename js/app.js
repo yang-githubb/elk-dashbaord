@@ -121,8 +121,6 @@
 
     ui.fillSelect(ui.$("line"), [{ value: "", label: "All lines" }, ...lines.map((l) => ({ value: l, label: l }))]);
     ui.fillSelect(ui.$("model"), [{ value: "", label: "All models" }, ...models.map((m) => ({ value: m, label: m }))]);
-
-    D.applyProfileBanner();
   }
 
   async function loadBoardList(signal) {
@@ -225,14 +223,6 @@
   }
 
   async function checkHealth() {
-    if (D.useMock()) {
-      ui.setStatus(true);
-      D.applyProfileBanner();
-      return;
-    }
-
-    D.applyProfileBanner();
-
     if (esClient.usesProxy()) {
       try {
         const res = await fetch(`${esClient.proxyBaseUrl()}/search`, { method: "OPTIONS" });

@@ -135,7 +135,7 @@
       const labels = D.getTimeLabels();
       const range = labels[D.state.time] || D.state.time;
       const refresh = (D.config.refreshMs || 120000) / 1000;
-      const mode = D.config.useMock ? D.config.profileLabel : `${D.config.profileLabel} · ${D.config.environmentLabel}`;
+      const mode = D.config.environmentLabel || D.config.environment;
       const station = D.config.schemaLabel || D.state.station;
       this.setText("mode-label", `${mode} · ${station} · ${boardCount} boards · ${padCount} pads · ${range} · refresh ${refresh}s`);
     },
