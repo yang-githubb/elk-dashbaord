@@ -28,16 +28,31 @@ window.DASHBOARD_SCHEMAS.SPI = {
   },
 
   kpi: {
+    // Per-pad KPIs — count each pad document by pad_result (not pcb_result)
+    componentResultField: "pad_result.keyword",
     good: ["GOOD"],
-    pass: ["PASS", "WARNING"],
+    pass: ["WARNING"],
     fail: ["NG"],
+
+    // Board pass/fail — fail if any pad on the board is NG
+    boardFailField: "pad_result.keyword",
+    boardFail: ["NG"],
+
+    // Optional: pcb-level result for reference (not used for pad KPI counts)
+    boardResultField: "pcb_result.keyword",
+
     serialField: "array_barcode.keyword",
-    serialSourceFields: ["array_barcode", "panel_barcode", "barcode", "source_file"],
+    serialSourceFields: ["array_barcode", "source_file"],
     excludeEmptySerial: true,
     excludeLeadingUnderscoreSource: true,
-    resultField: "pcb_result.keyword",
     boardCountField: "pad_no",
   },
+
+  detailSort: [
+    { timestamp: { order: "desc" } },
+    { pad_no: { order: "asc" } },
+    { "component_id.keyword": { order: "asc" } },
+  ],
 
   boardColumns: [
     { key: "serial", label: "Serial", type: "serial" },
@@ -61,13 +76,14 @@ window.DASHBOARD_SCHEMAS.SPI = {
     { key: "area", label: "Area", type: "number" },
     { key: "offset_x", label: "Offset X", type: "number" },
     { key: "offset_y", label: "Offset Y", type: "number" },
+    { key: "pad_result", label: "Pad Result", type: "result" },
     { key: "is_defect", label: "Defect", type: "bool" },
     { key: "inspection_date", label: "Insp. Date" },
   ],
 
   padSourceFields: [
-    "timestamp", "pcb_name", "line", "station", "machine",
+    "timestamp", "pcb_name", "line", "station", "machine", "array_barcode",
     "component_id", "pad_no", "volume", "height", "area", "offset_x", "offset_y",
-    "is_defect", "inspection_date", "array_barcode", "source_file",
+    "pad_result", "pcb_result", "is_defect", "inspection_date", "source_file",
   ],
 };

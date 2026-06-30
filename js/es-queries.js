@@ -56,6 +56,17 @@
       return kpi.boardResultField || kpi.resultField || "pcb_result.keyword";
     },
 
+    boardFailField() {
+      const kpi = D.getKpi();
+      return (
+        kpi.boardFailField ||
+        kpi.componentResultField ||
+        kpi.boardResultField ||
+        kpi.resultField ||
+        "pcb_result.keyword"
+      );
+    },
+
     boardFailValues() {
       const kpi = D.getKpi();
       return kpi.boardFail || kpi.fail || ["NG"];
@@ -63,7 +74,7 @@
 
     buildBoardKpiAgg(afterKey = null) {
       const kpi = D.getKpi();
-      const rf = this.boardResultField();
+      const failField = this.boardFailField();
       const failValues = this.boardFailValues();
       const agg = {
         size: 0,
@@ -75,7 +86,7 @@
               sources: [{ board: { terms: { field: kpi.serialField || "array_barcode.keyword" } } }],
             },
             aggs: {
-              has_ng: { filter: { terms: { [rf]: failValues } } },
+              has_ng: { filter: { terms: { [failField]: failValues } } },
             },
           },
         },
@@ -87,8 +98,9 @@
     buildBoardListAgg(afterKey = null) {
       const fields = D.getFields();
       const kpi = D.getKpi();
-      const rf = this.boardResultField();
+      const failField = this.boardFailField();
       const failValues = this.boardFailValues();
+      const boardResultField = this.boardResultField();
       const countField = kpi.boardCountField || "pad_no";
       const countAgg =
         kpi.boardCountAgg === "cardinality"
@@ -100,8 +112,8 @@
         top_line: { terms: { field: D.esField(fields.line), size: 1 } },
         top_model: { terms: { field: D.esField(fields.model), size: 1 } },
         pad_count: countAgg,
-        has_ng: { filter: { terms: { [rf]: failValues } } },
-        top_result: { terms: { field: rf, size: 1 } },
+        has_ng: { filter: { terms: { [failField]: failValues } } },
+        top_result: { terms: { field: boardResultField, size: 1 } },
       };
 
       if (fields.machine) {

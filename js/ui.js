@@ -336,7 +336,7 @@
         machine,
         timestamp: latest != null ? (typeof latest === "number" ? new Date(latest).toISOString() : latest) : null,
         pad_count: bucket.pad_count?.value ?? bucket.doc_count ?? 0,
-        result: topResult != null ? D.normalizeResult(topResult) : hasNg ? "FAIL" : "PASS",
+        result: hasNg ? "FAIL" : topResult != null ? D.normalizeResult(topResult) : "PASS",
       };
     },
 
