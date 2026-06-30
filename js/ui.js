@@ -234,7 +234,8 @@
     },
 
     renderBoardTable(rows, onSerialClick, clickable = true) {
-      this.renderDataTable("board-thead", "board-tbody", D.getBoardColumns(), rows, {
+      const validRows = rows.filter((row) => row.serial && row.serial !== "—");
+      this.renderDataTable("board-thead", "board-tbody", D.getBoardColumns(), validRows, {
         emptyText: "No boards match the current filters.",
         clickable,
         onSerialClick: clickable ? onSerialClick : undefined,
@@ -286,15 +287,43 @@
   };
 
   D.transform = {
+    barcodeFromSourceFile(path) {
+      if (!path) return null;
+      const m = String(path).match(/_([A-Za-z0-9]+)_\d{14}\./);
+      return m?.[1] ?? null;
+    },
+
+    resolveBoardSerial(bucket) {
+      const fields = D.getFields();
+      const hit = bucket.top_serial?.hits?.hits?.[0]?._source;
+      if (hit) {
+        const fromDoc = hit.panel_barcode ?? hit.barcode ?? hit[fields.serial];
+        if (fromDoc != null && String(fromDoc).trim()) return formatSerial(fromDoc);
+        const fromFile = D.transform.barcodeFromSourceFile(hit.source_file);
+        if (fromFile) return fromFile;
+      }
+
+      const key = bucket.key?.board;
+      if (key == null || key === "") return "—";
+      const keyStr = String(key);
+      // Small integers are panel_id, not barcodes — hide unless we have no top_hit
+      if (/^\d{1,4}$/.test(keyStr) && !hit) return "—";
+      return formatSerial(key);
+    },
+
     boardBucketToRow(bucket) {
       const hasNg = (bucket.has_ng?.doc_count ?? 0) > 0;
       const latest = bucket.latest?.value;
       const topResult = bucket.top_result?.buckets?.[0]?.key;
+      const hit = bucket.top_serial?.hits?.hits?.[0]?._source;
+      const machine =
+        bucket.top_machine?.buckets?.[0]?.key ?? hit?.tester_name ?? hit?.machine ?? null;
+
       return {
-        serial: formatSerial(bucket.key.board),
+        serial: D.transform.resolveBoardSerial(bucket),
         model: bucket.top_model?.buckets?.[0]?.key ?? null,
         line: bucket.top_line?.buckets?.[0]?.key ?? null,
-        machine: bucket.top_machine?.buckets?.[0]?.key ?? null,
+        machine,
         timestamp: latest != null ? (typeof latest === "number" ? new Date(latest).toISOString() : latest) : null,
         pad_count: bucket.pad_count?.value ?? bucket.doc_count ?? 0,
         result: topResult != null ? D.normalizeResult(topResult) : hasNg ? "FAIL" : "PASS",

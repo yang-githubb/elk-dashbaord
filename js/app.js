@@ -256,7 +256,7 @@
   }
 
   function openPadView(serial) {
-    if (!serial || !D.isPadLevel()) return;
+    if (!serial || serial === "—" || !D.isPadLevel()) return;
     ui.showPadView(serial);
     resetPadPaging();
     loadDashboard();

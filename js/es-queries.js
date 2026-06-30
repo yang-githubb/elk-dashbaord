@@ -16,6 +16,8 @@
       if (D.state.line) filters.push({ term: { [D.esField(fields.line)]: D.state.line } });
       if (D.state.model) filters.push({ term: { [D.esField(fields.model)]: D.state.model } });
       filters.push({ term: { [D.esField(fields.station)]: D.state.station } });
+      const requireSerial = D.getKpi().requireSerialField;
+      if (requireSerial) filters.push({ exists: { field: requireSerial } });
       return filters;
     },
 
@@ -96,6 +98,15 @@
       if (fields.machine) {
         boardAggs.top_machine = { terms: { field: D.esField(fields.machine), size: 1 } };
       }
+
+      const serialSources = D.getKpi().serialSourceFields || [fields.serial, "barcode", "source_file"];
+      boardAggs.top_serial = {
+        top_hits: {
+          size: 1,
+          sort: [{ [fields.time]: { order: "desc" } }],
+          _source: { includes: serialSources },
+        },
+      };
 
       const agg = {
         size: 0,

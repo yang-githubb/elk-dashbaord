@@ -1,11 +1,10 @@
 /**
  * AOI component-level inspection schema.
- * Field names aligned with AOI export / ELK documents (see sample CSV).
+ * Field names from AOI ELK documents (see sample CSV + SAMPLE_SOURCE_AOI).
  *
- * Board header: barcode (50831B6), result (PASS/FAIL), program_name, machine (tester)
- * panel_id is numeric (1, 2…) — do NOT use for board list / cardinality
- * Component rows: ref_descrd_name, lead, comp_part_no, package_name,
- *                  machine_call, repair_status, operator_call, component_barcode
+ * panel_barcode = "50831B6" (string) — use for board list / cardinality
+ * panel_id = 1, 2, 3… (number) — do NOT use for grouping
+ * barcode may duplicate panel_barcode or be absent on some rows
  */
 window.DASHBOARD_SCHEMAS = window.DASHBOARD_SCHEMAS || {};
 
@@ -24,9 +23,9 @@ window.DASHBOARD_SCHEMAS.AOI = {
     time: "timestamp",
     line: "line",
     model: "program_name",
-    serial: "barcode",
+    serial: "panel_barcode",
     station: "station",
-    machine: "machine",
+    machine: "tester_name",
   },
 
   resultMap: {
@@ -37,17 +36,17 @@ window.DASHBOARD_SCHEMAS.AOI = {
   },
 
   kpi: {
-    // Board pass/fail — panel-level result on each document
     boardResultField: "result.keyword",
     boardFail: ["FAIL"],
+    requireSerialField: "panel_barcode",
 
-    // Component KPIs — operator verdict per inspection row
     componentResultField: "operator_call.keyword",
     good: ["GOOD"],
     pass: [],
     fail: ["FAIL", "NG"],
 
-    serialField: "barcode.keyword",
+    serialField: "panel_barcode.keyword",
+    serialSourceFields: ["panel_barcode", "barcode", "source_file"],
     boardCountField: "ref_descrd_name",
     boardCountAgg: "cardinality",
   },
@@ -72,7 +71,7 @@ window.DASHBOARD_SCHEMAS.AOI = {
     { key: "timestamp", label: "Test Time", type: "time" },
     { key: "ref_des", label: "Ref Des", source: "ref_descrd_name" },
     { key: "lead", label: "Lead" },
-    { key: "comp_part_no", label: "Comp Part #" },
+    { key: "comp_part_no", label: "Comp Part #", source: "comp_part_num" },
     { key: "package_name", label: "Package" },
     { key: "machine_call", label: "Machine Call" },
     { key: "repair_status", label: "Repair Status" },
@@ -84,17 +83,19 @@ window.DASHBOARD_SCHEMAS.AOI = {
     "timestamp",
     "ref_descrd_name",
     "lead",
-    "comp_part_no",
+    "comp_part_num",
     "package_name",
     "machine_call",
     "repair_status",
     "operator_call",
     "component_barcode",
     "program_name",
-    "barcode",
     "panel_barcode",
+    "barcode",
+    "tester_name",
     "machine",
     "line",
     "result",
+    "source_file",
   ],
 };
