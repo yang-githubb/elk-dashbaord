@@ -18,6 +18,8 @@
     boardAfterStack: [null],
     loading: false,
     abort: null,
+    padSearch: "",
+    boardSearch: ""
   };
 
   D.applyStationSchema(D.state.station);
@@ -67,39 +69,67 @@
   }
 
   async function computeBoardKpi(signal) {
-    const now = Date.now();
-    if (boardKpiCache && now - boardKpiTs < D.config.boardCacheMs) {
-      return boardKpiCache;
-    }
+    const start = performance.now();
+    try {
+       const kpi = D.getKpi();
 
-    let afterKey = null;
-    let boardPass = 0;
-    let boardFail = 0;
-    let boardCount = 0;
+           
+      console.log(
+          "KPI serial field:",
+          kpi.serialField
+      );
 
-    while (true) {
-      const res = await esClient.search(esQueries.buildBoardKpiAgg(afterKey), signal);
-      const buckets = res.aggregations?.boards?.buckets ?? [];
-      if (!buckets.length) break;
+      console.log(
+          "KPI fail field:",
+          kpi.boardFailField
+      );
+    const res = await esClient.search(
+      {
+        size: 0,
+        query: esQueries.buildEsQuery(esQueries.buildEsFilters()),
+        aggs: {
+          total_boards: {
+            cardinality: {
+              field: kpi.serialField,
+              precision_threshold: 100
+            }
+          },
+          fail_boards: {
+            filter: {
+              terms: {
+                [kpi.boardFailField]: kpi.boardFail
+              }
+            },
+            aggs: {
+              count: {
+                cardinality: {
+                  field: kpi.serialField,
+                  precision_threshold: 100
+                }
+              }
+            }
+          }
+        }
+      },
+      signal
+    );
 
-      for (const b of buckets) {
-        boardCount++;
-        if (b.has_ng.doc_count > 0) boardFail++;
-        else boardPass++;
-      }
-
-      afterKey = res.aggregations.boards.after_key;
-      if (!afterKey) break;
-    }
-
-    boardKpiCache = {
+    const boardCount = res.aggregations.total_boards?.value ?? 0;
+    const boardFail = res.aggregations.fail_boards?.count?.value ?? 0;
+    const boardPass = boardCount - boardFail;
+    return {
       boardCount,
       boardPass,
       boardFail,
-      boardYield: boardCount ? (boardPass / boardCount) * 100 : 0,
+      boardYield: boardCount ? (boardPass / boardCount) * 100 : 0
     };
-    boardKpiTs = now;
-    return boardKpiCache;
+    } finally {
+      console.log(
+        "computeBoardKpi:",
+        (performance.now() - start).toFixed(0),
+        "ms"
+      );
+    }
   }
 
   async function loadFilters() {
@@ -135,102 +165,267 @@
   }
 
   async function loadBoardList(signal) {
-    const afterKey = D.state.boardAfterStack[D.state.boardPage] ?? null;
-    const res = await esClient.search(esQueries.buildBoardListAgg(afterKey), signal);
-    const rows = (res.aggregations?.boards?.buckets ?? []).map(transform.boardBucketToRow);
+    
+      console.log(
+          "Using KPI cache:",
+          !!boardKpiCache
+      );
 
-    const boardKpi = boardKpiCache ?? (await computeBoardKpi(signal));
-    D.state.boardTotalPages = Math.max(1, Math.ceil(boardKpi.boardCount / D.config.pageSize));
+      const loadBoardStart = performance.now();
 
-    const nextAfter = res.aggregations?.boards?.after_key;
-    if (nextAfter && D.state.boardAfterStack.length === D.state.boardPage + 1) {
-      D.state.boardAfterStack.push(nextAfter);
-    }
+      const afterKey =
+          D.state.boardAfterStack[
+              D.state.boardPage
+          ] ?? null;
 
-    ui.renderBoardTable(rows, openPadView, D.isPadLevel());
-    ui.updateBoardPager();
-    return boardKpi;
+      const esStart = performance.now();
+
+      const res = await esClient.search(
+          esQueries.buildBoardListAgg(afterKey),
+          signal
+      );
+
+      console.log(
+          "ES board search:",
+          (performance.now() - esStart).toFixed(0),
+          "ms"
+      );
+
+      const rows =
+          (res.aggregations?.boards?.buckets ?? [])
+              .map(transform.boardBucketToRow);
+
+      let boardKpi = boardKpiCache;
+
+      if (!boardKpi) {
+
+          boardKpi = await computeBoardKpi(signal);
+
+          boardKpiCache = boardKpi;
+      }
+
+      D.state.boardTotalPages = Math.max(
+          1,
+          Math.ceil(
+              boardKpi.boardCount /
+              D.config.pageSize
+          )
+      );
+
+      const nextAfter =
+          res.aggregations?.boards?.after_key;
+
+      if (
+          nextAfter &&
+          D.state.boardAfterStack.length ===
+              D.state.boardPage + 1
+      ) {
+          D.state.boardAfterStack.push(
+              nextAfter
+          );
+      }
+
+      ui.renderBoardTable(
+          rows,
+          openPadView,
+          D.isPadLevel()
+      );
+
+      ui.updateBoardPager();
+
+      console.log(
+          "loadBoardList:",
+          (performance.now() - loadBoardStart).toFixed(0),
+          "ms"
+      );
+
+      return boardKpi;
   }
-
+  
   async function loadPads(page, signal) {
-    if (!D.isPadLevel()) return;
+    console.time("loadPads");
+      if (!D.isPadLevel()) return;
 
-    const fields = D.getFields();
-    const serial = D.state.selectedSerial;
-    if (!serial) return;
+      const fields = D.getFields();
+      const serial = D.state.selectedSerial;
 
-    const res = await esClient.search(
-      {
-        from: page * D.config.pageSize,
-        size: D.config.pageSize,
-        track_total_hits: true,
-        sort: D.getDetailSort() || [{ [fields.time]: { order: "desc" } }, { pad_no: { order: "asc" } }],
-        query: esQueries.buildEsQuery(esQueries.buildPadFilters(serial)),
-        _source: D.getPadSourceFields(),
-      },
-      signal,
-    );
+      if (!serial) return;
 
-    const total = typeof res.hits.total === "number" ? res.hits.total : (res.hits.total?.value ?? 0);
-    D.state.padTotalPages = Math.max(1, Math.ceil(total / D.config.pageSize));
-    D.state.padPage = page;
+      const filters = esQueries.buildPadFilters(serial);
+    
+      const query = {
+          bool: {
+              filter: filters
+          }
+      };
 
-    ui.renderPadTable(res.hits.hits.map(transform.hitToPadRow));
-    ui.updatePadPager();
+      if (D.state.padSearch?.trim()) {
+
+          const searchText = D.state.padSearch.trim();
+
+          if (D.state.station === "AOI") {
+
+              query.bool.filter.push({
+                prefix: {
+                  "ref_descrd_name.keyword": searchText.toUpperCase()
+                }
+              });
+          } else {
+              const padNo = Number(searchText);
+
+              if (!isNaN(padNo)) {
+                  query.bool.filter.push({
+                      term: {
+                          pad_no: padNo
+                      }
+                  });
+              }
+          }
+      }
+
+      const res = await esClient.search(
+          {
+              from: page * D.config.pageSize,
+              size: D.config.pageSize,
+              track_total_hits: true,
+
+              sort: D.getDetailSort() || [
+                  { [fields.time]: { order: "desc" } },
+                  { pad_no: { order: "asc" } }
+              ],
+
+              query,
+
+              _source: D.getPadSourceFields()
+          },
+          signal
+      );
+
+      const total =
+          typeof res.hits.total === "number"
+              ? res.hits.total
+              : (res.hits.total?.value ?? 0);
+
+      D.state.padTotalPages = Math.max(
+          1,
+          Math.ceil(total / D.config.pageSize)
+      );
+
+      D.state.padPage = page;
+
+      ui.renderPadTable(
+          res.hits.hits.map(transform.hitToPadRow)
+      );
+
+      ui.updatePadPager();
+      console.timeEnd("loadPads");
   }
 
   async function loadDashboard(silent = false) {
-    if (!silent) ui.setLoading(true);
-    ui.hideError();
+    
+      console.log(
+          "Using KPI cache:",
+          !!boardKpiCache
+      );
 
-    if (!D.isPadLevel()) {
-      ui.$("pad-panel")?.classList.add("hidden");
-      D.state.view = "boards";
-      D.state.selectedSerial = null;
-    }
-
-    D.state.abort?.abort();
-    const controller = new AbortController();
-    D.state.abort = controller;
-
-    try {
-      if (D.isPadLevel() && D.state.view === "pads" && D.state.selectedSerial) {
-        const [aggRes, boardKpi] = await Promise.all([
-          esClient.search(
-            { size: 0, query: esQueries.buildEsQuery(esQueries.buildEsFilters()), aggs: esQueries.buildDashboardAggs() },
-            controller.signal,
-          ),
-          computeBoardKpi(controller.signal),
-        ]);
-        if (controller.signal.aborted) return;
-        ui.applyKpis(aggRes, boardKpi);
-        await loadPads(D.state.padPage, controller.signal);
-        ui.setStatus(true);
-        return;
+      if (!silent) {
+          ui.setLoading(true);
       }
 
-      const query = esQueries.buildEsQuery(esQueries.buildEsFilters());
-      const [aggRes, boardKpi] = await Promise.all([
-        esClient.search({ size: 0, query, aggs: esQueries.buildDashboardAggs() }, controller.signal),
-        computeBoardKpi(controller.signal),
-      ]);
+      ui.hideError();
 
-      if (controller.signal.aborted) return;
-
-      ui.applyKpis(aggRes, boardKpi);
-      await loadBoardList(controller.signal);
-      ui.setStatus(true);
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      ui.setStatus(false);
-      ui.showError(err.message || "Failed to load data");
-    } finally {
-      if (!controller.signal.aborted) {
-        ui.setLoading(false);
-        ui.updateBoardPager();
-        ui.updatePadPager();
+      if (!D.isPadLevel()) {
+          ui.$("pad-panel")?.classList.add("hidden");
+          D.state.view = "boards";
+          D.state.selectedSerial = null;
       }
-    }
+
+      D.state.abort?.abort();
+
+      const controller = new AbortController();
+      D.state.abort = controller;
+
+      try {
+
+          const query = esQueries.buildEsQuery(
+              esQueries.buildEsFilters()
+          );
+
+          const aggPromise = esClient.search(
+              {
+                  size: 0,
+                  query,
+                  aggs: esQueries.buildDashboardAggs()
+              },
+              controller.signal
+          );
+
+          let boardKpi = boardKpiCache;
+
+          if (!boardKpi) {
+
+              boardKpi = await computeBoardKpi(
+                  controller.signal
+              );
+
+              boardKpiCache = boardKpi;
+          }
+
+          const aggRes = await aggPromise;
+
+          if (controller.signal.aborted) {
+              return;
+          }
+
+          ui.applyKpis(
+              aggRes,
+              boardKpi
+          );
+
+          const isPadView =
+              D.isPadLevel() &&
+              D.state.view === "pads" &&
+              D.state.selectedSerial;
+
+          if (isPadView) {
+
+              await loadPads(
+                  D.state.padPage,
+                  controller.signal
+              );
+
+          } else {
+
+              await loadBoardList(
+                  controller.signal
+              );
+          }
+
+          ui.setStatus(true);
+
+      } catch (err) {
+
+          if (controller.signal.aborted) {
+              return;
+          }
+
+          ui.setStatus(false);
+
+          ui.showError(
+              err?.message || "Failed to load data"
+          );
+
+      } finally {
+
+          if (!controller.signal.aborted) {
+
+              ui.setLoading(false);
+
+              ui.updateBoardPager();
+
+              ui.updatePadPager();
+          }
+      }
   }
 
   async function checkHealth() {
@@ -257,9 +452,60 @@
 
   function openPadView(serial) {
     if (!serial || serial === "—" || !D.isPadLevel()) return;
+    
+    D.state.padSearch = "";
+
+    if (ui.$("pad-search")) {
+        ui.$("pad-search").value = "";
+    }
+
     ui.showPadView(serial);
     resetPadPaging();
     loadDashboard();
+  }
+
+  async function exportCurrentBoard() {
+
+    const serial = D.state.selectedSerial;
+
+    if (!serial) {
+      alert("Please select a board first.");
+      return;
+    }
+
+    const res = await esClient.search(
+      {
+        size: 10000,
+        sort: [
+          {
+            pad_no: {
+              order: "asc"
+            }
+          }
+        ],
+        query: esQueries.buildEsQuery(
+          esQueries.buildPadFilters(serial)
+        ),
+        _source: D.getPadSourceFields()
+      }
+    );
+
+    const rows = res.hits.hits.map(hit => hit._source);
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Board Details"
+    );
+
+    XLSX.writeFile(
+      workbook,
+      `${serial}.xlsx`
+    );
   }
 
   function backToBoards() {
@@ -275,12 +521,30 @@
     D.state.model = ui.$("model").value;
 
     const newStation = ui.$("station").value;
-    if (newStation !== D.state.station) {
+
+  if (newStation !== D.state.station) {
       D.state.station = newStation;
+
       D.applyStationSchema(newStation);
+
       ui.updateStationLabels();
       updatePadPanelVisibility();
-    }
+
+      // clear dependent filters
+      D.state.line = "";
+      D.state.model = "";
+
+      ui.$("line").value = "";
+      ui.$("model").value = "";
+
+      // reload dropdown contents
+      loadFilters()
+        .then(() => loadDashboard())
+        .catch((err) => ui.showError(err.message || "Failed to load filters"));
+
+      return;
+  }
+
 
     D.state.selectedSerial = null;
     resetBoardPaging();
@@ -297,34 +561,124 @@
   ui.$("refresh").addEventListener("click", () => loadDashboard());
   ui.$("retry").addEventListener("click", () => loadDashboard());
   ui.$("back-boards").addEventListener("click", backToBoards);
+  
+  let padSearchTimer;
 
-  ui.$("board-prev").addEventListener("click", () => {
-    if (D.state.boardPage > 0) {
-      D.state.boardPage--;
-      loadDashboard();
-    }
-  });
+  ui.$("pad-search")?.addEventListener(
+      "input",
+      () => {
 
-  ui.$("board-next").addEventListener("click", () => {
-    if (D.state.boardPage + 1 < D.state.boardTotalPages) {
-      D.state.boardPage++;
-      loadDashboard();
-    }
-  });
+          clearTimeout(padSearchTimer);
 
-  ui.$("pad-prev").addEventListener("click", () => {
-    if (D.state.padPage > 0) {
-      D.state.padPage--;
-      loadDashboard();
-    }
-  });
+          padSearchTimer = setTimeout(() => {
 
-  ui.$("pad-next").addEventListener("click", () => {
-    if (D.state.padPage + 1 < D.state.padTotalPages) {
-      D.state.padPage++;
-      loadDashboard();
-    }
-  });
+              D.state.padSearch =
+                  ui.$("pad-search").value.trim();
+
+              D.state.padPage = 0;
+
+              loadPads(
+                  0,
+                  D.state.abort?.signal
+              );
+
+          }, 300);
+      }
+  );
+
+  let boardSearchTimer;
+
+  ui.$("board-search")?.addEventListener(
+      "input",
+      () => {
+
+          clearTimeout(boardSearchTimer);
+
+          boardSearchTimer = setTimeout(() => {
+
+              D.state.boardSearch =
+                  ui.$("board-search").value.trim();
+
+              resetBoardPaging();
+
+              loadDashboard();
+
+          }, 300);
+      }
+  );
+
+  ui.$("export-board").addEventListener(
+    "click",
+    exportCurrentBoard
+  );
+
+  ui.$("board-prev").addEventListener(
+      "click",
+      async () => {
+
+          if (D.state.boardPage > 0) {
+
+              D.state.boardPage--;
+
+              await loadBoardList(
+                  D.state.abort?.signal
+              );
+          }
+      }
+  );
+
+  ui.$("board-next").addEventListener(
+      "click",
+      async () => {
+
+          if (
+              D.state.boardPage + 1 <
+              D.state.boardTotalPages
+          ) {
+
+              D.state.boardPage++;
+
+              await loadBoardList(
+                  D.state.abort?.signal
+              );
+          }
+      }
+  );
+
+  ui.$("pad-prev").addEventListener(
+      "click",
+      async () => {
+
+          if (D.state.padPage > 0) {
+
+              D.state.padPage--;
+
+              await loadPads(
+                  D.state.padPage,
+                  D.state.abort?.signal
+              );
+          }
+      }
+  );
+
+  ui.$("pad-next").addEventListener(
+      "click",
+      async () => {
+
+          if (
+              D.state.padPage + 1 <
+              D.state.padTotalPages
+          ) {
+
+              D.state.padPage++;
+
+              await loadPads(
+                  D.state.padPage,
+                  D.state.abort?.signal
+              );
+          }
+      }
+  );
 
   setInterval(() => loadDashboard(true), D.config.refreshMs);
   setInterval(checkHealth, D.config.healthMs);

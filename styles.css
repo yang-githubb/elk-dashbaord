@@ -453,3 +453,15 @@ td {
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+.pad-toolbar {
+    margin: 10px 0;
+}
+
+.search-box {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d0d7de;
+    border-radius: 4px;
+    font-size: 14px;
+}

@@ -1,9 +1,14 @@
 /**
- * AOI component-level inspection schema.
+ * AOI Component-Level Inspection Schema
  *
- * AOI uses panel_barcode / barcode (e.g. 50831B6) — NOT array_barcode (SPI only).
- * panel_id is numeric (1, 2, 3…) — never use for grouping.
+ * Board KPI:
+ *   barcode -> unique board identity
+ *   result  -> PASS / NG
+ *
+ * Component KPI:
+ *   operator_call -> GOOD / defect type
  */
+
 window.DASHBOARD_SCHEMAS = window.DASHBOARD_SCHEMAS || {};
 
 window.DASHBOARD_SCHEMAS.AOI = {
@@ -12,43 +17,127 @@ window.DASHBOARD_SCHEMAS.AOI = {
   station: "AOI",
   isPadLevel: true,
 
-  boardHint: "Click a panel barcode to view component inspections",
+  // ============================================================
+  // UI
+  // ============================================================
+
+  boardHint: "Click a barcode to view component inspections",
   detailTitle: "Components for",
   detailCountLabel: "components",
   kpiDetailLabel: "Component",
+
+  // ============================================================
+  // FIELD MAPPING
+  // ============================================================
 
   fields: {
     time: "timestamp",
     line: "line",
     model: "program_name",
-    serial: "panel_barcode",
+
+    // Master board identity
+    serial: "barcode",
+
     station: "station",
     machine: "tester_name",
   },
 
+  // ============================================================
+  // RESULT NORMALIZATION
+  // ============================================================
+
   resultMap: {
     GOOD: "GOOD",
+
     PASS: "PASS",
-    FAIL: "FAIL",
+
     NG: "FAIL",
+    FAIL: "FAIL",
+
+    MISSING: "FAIL",
+    SOLDER_JOINT: "FAIL",
+    PADOVERHANG: "FAIL",
+    LIFTED_LEAD: "FAIL",
+    OVERHANG: "FAIL",
+    BRIDGING: "FAIL",
+    MISSING_LEAD: "FAIL",
+    DIMENSION: "FAIL",
+    LIFTED_BODY: "FAIL",
+    POLARITY: "FAIL",
+    UPSIDEDOWN: "FAIL",
+    OCR_OCV: "FAIL",
+    FOREIGNMATERIAL_LEAD: "FAIL",
+    COPLANARITY: "FAIL",
+    COMPONENT_SHIFT: "FAIL",
+    TOMBSTONE: "FAIL",
+    FOREIGNMATERIAL_BODY: "FAIL",
   },
 
+  // ============================================================
+  // KPI LOGIC
+  // ============================================================
+
   kpi: {
+    // ------------------------
+    // BOARD KPI
+    // ------------------------
+
     boardResultField: "result.keyword",
-    boardFail: ["FAIL"],
-    requireSerialField: "panel_barcode",
+    boardFailField: "result.keyword",
+
+    // AOI board failures are NG
+    boardFail: ["NG"],
+
+    requireSerialField: "barcode",
     excludeEmptySerial: true,
 
-    componentResultField: "operator_call.keyword",
-    good: ["GOOD"],
-    pass: [],
-    fail: ["FAIL", "NG"],
+    // ------------------------
+    // COMPONENT KPI
+    // ------------------------
 
-    serialField: "panel_barcode.keyword",
-    serialSourceFields: ["panel_barcode", "barcode", "source_file"],
+    componentResultField: "operator_call.keyword",
+
+    good: [],
+
+    pass: ["GOOD"],
+
+    fail: [
+      "MISSING",
+      "SOLDER_JOINT",
+      "PADOVERHANG",
+      "LIFTED_LEAD",
+      "OVERHANG",
+      "BRIDGING",
+      "MISSING_LEAD",
+      "DIMENSION",
+      "LIFTED_BODY",
+      "POLARITY",
+      "UPSIDEDOWN",
+      "OCR_OCV",
+      "FOREIGNMATERIAL_LEAD",
+      "COPLANARITY",
+      "COMPONENT_SHIFT",
+      "TOMBSTONE",
+      "FOREIGNMATERIAL_BODY",
+    ],
+
+    // ------------------------
+    // BOARD IDENTITY
+    // ------------------------
+
+    serialField: "barcode.keyword",
+
+    // Avoid duplicate board identities
+    serialSourceFields: ["barcode"],
+
+    // Component count per board
     boardCountField: "ref_descrd_name",
     boardCountAgg: "cardinality",
   },
+
+  // ============================================================
+  // DETAIL SORTING
+  // ============================================================
 
   detailSort: [
     { timestamp: { order: "desc" } },
@@ -56,8 +145,12 @@ window.DASHBOARD_SCHEMAS.AOI = {
     { "machine_call.keyword": { order: "asc" } },
   ],
 
+  // ============================================================
+  // BOARD TABLE
+  // ============================================================
+
   boardColumns: [
-    { key: "serial", label: "Panel Barcode", type: "serial" },
+    { key: "serial", label: "Barcode", type: "serial" },
     { key: "model", label: "Program" },
     { key: "machine", label: "Tester" },
     { key: "line", label: "Line" },
@@ -65,6 +158,10 @@ window.DASHBOARD_SCHEMAS.AOI = {
     { key: "pad_count", label: "Components", type: "number" },
     { key: "result", label: "Result", type: "result" },
   ],
+
+  // ============================================================
+  // COMPONENT TABLE
+  // ============================================================
 
   padColumns: [
     { key: "timestamp", label: "Test Time", type: "time" },
@@ -78,6 +175,10 @@ window.DASHBOARD_SCHEMAS.AOI = {
     { key: "component_barcode", label: "Component Barcode" },
   ],
 
+  // ============================================================
+  // ES SOURCE FIELDS
+  // ============================================================
+
   padSourceFields: [
     "timestamp",
     "ref_descrd_name",
@@ -89,8 +190,8 @@ window.DASHBOARD_SCHEMAS.AOI = {
     "operator_call",
     "component_barcode",
     "program_name",
-    "panel_barcode",
     "barcode",
+    "panel_barcode",
     "tester_name",
     "machine",
     "line",

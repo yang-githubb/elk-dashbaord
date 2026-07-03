@@ -1,4 +1,4 @@
-/** SPI pad-level inspection schema */
+/** SPI pad-level inspection schema (FIXED + CLEAN) */
 window.DASHBOARD_SCHEMAS = window.DASHBOARD_SCHEMAS || {};
 
 window.DASHBOARD_SCHEMAS.SPI = {
@@ -7,19 +7,23 @@ window.DASHBOARD_SCHEMAS.SPI = {
   station: "SPI",
   isPadLevel: true,
 
+  // ================= UI =================
   boardHint: "Click a serial to view pad inspection data",
   detailTitle: "Pads for",
   detailCountLabel: "pads",
   kpiDetailLabel: "Pad",
 
+  // ================= FIELD MAPPING =================
   fields: {
     time: "timestamp",
     line: "line",
     model: "pcb_name",
-    serial: "array_barcode",
+    serial: "array_barcode", // ✅ SPI board identity
     station: "station",
   },
 
+  // ================= RESULT NORMALIZATION =================
+  // Used only for UI coloring / labels
   resultMap: {
     GOOD: "GOOD",
     PASS: "PASS",
@@ -27,33 +31,102 @@ window.DASHBOARD_SCHEMAS.SPI = {
     NG: "FAIL",
   },
 
+  // ================= KPI LOGIC =================
   kpi: {
-    // Per-pad KPIs — count each pad document by pad_result (not pcb_result)
+
+    // =====================================================
+    // PAD LEVEL
+    // =====================================================
+
     componentResultField: "pad_result.keyword",
-    good: ["GOOD"],
-    pass: ["WARNING"],
-    fail: ["NG"],
 
-    // Board pass/fail — fail if any pad on the board is NG
-    boardFailField: "pad_result.keyword",
-    boardFail: ["NG"],
+    good: [
+      "GOOD"
+    ],
 
-    // Optional: pcb-level result for reference (not used for pad KPI counts)
+    pass: [],
+
+    fail: [
+      "EXCESSIVE_VOLUME",
+      "INSUFFICIENT_VOLUME",
+      "POSITION",
+      "BRIDGING",
+      "SMEAR",
+      "HIGH_AREA",
+      "LOW_AREA",
+      "SHAPE",
+      "UPPER_HEIGHT",
+      "LOW_HEIGHT"
+    ],
+
+    // Used for board fail calculation
+    padFailResults: [
+      "EXCESSIVE_VOLUME",
+      "INSUFFICIENT_VOLUME",
+      "POSITION",
+      "BRIDGING",
+      "SMEAR",
+      "HIGH_AREA",
+      "LOW_AREA",
+      "SHAPE",
+      "UPPER_HEIGHT",
+      "LOW_HEIGHT"
+    ],
+
+    // =====================================================
+    // BOARD LEVEL
+    // =====================================================
+
     boardResultField: "pcb_result.keyword",
 
+    boardGood: [
+      "GOOD"
+    ],
+
+    boardPass: [
+      "PASS",
+      "WARNING"
+    ],
+
+    boardFail: [
+      "NG"
+    ],
+
+    boardFailField: "pcb_result.keyword",
+
+    // =====================================================
+    // BOARD IDENTITY
+    // =====================================================
+
     serialField: "array_barcode.keyword",
-    serialSourceFields: ["array_barcode", "source_file"],
+
+    serialSourceFields: [
+      "array_barcode"
+    ],
+
+    // =====================================================
+    // DATA CLEANUP
+    // =====================================================
+
     excludeEmptySerial: true,
+
     excludeLeadingUnderscoreSource: true,
-    boardCountField: "pad_no",
+
+    // =====================================================
+    // PAD COUNT
+    // =====================================================
+
+    boardCountField: "pad_no"
   },
 
+  // ================= SORT =================
   detailSort: [
     { timestamp: { order: "desc" } },
     { pad_no: { order: "asc" } },
     { "component_id.keyword": { order: "asc" } },
   ],
 
+  // ================= TABLE: BOARD =================
   boardColumns: [
     { key: "serial", label: "Serial", type: "serial" },
     { key: "model", label: "PCB Name" },
@@ -63,6 +136,7 @@ window.DASHBOARD_SCHEMAS.SPI = {
     { key: "result", label: "Result", type: "result" },
   ],
 
+  // ================= TABLE: PAD =================
   padColumns: [
     { key: "timestamp", label: "Timestamp", type: "time" },
     { key: "model", label: "PCB Name", source: "pcb_name" },
@@ -81,9 +155,26 @@ window.DASHBOARD_SCHEMAS.SPI = {
     { key: "inspection_date", label: "Insp. Date" },
   ],
 
+  // ================= SOURCE FIELDS =================
   padSourceFields: [
-    "timestamp", "pcb_name", "line", "station", "machine", "array_barcode",
-    "component_id", "pad_no", "volume", "height", "area", "offset_x", "offset_y",
-    "pad_result", "pcb_result", "is_defect", "inspection_date", "source_file",
+    "timestamp",
+    "pcb_name",
+    "line",
+    "station",
+    "machine",
+    "array_barcode",
+    "component_id",
+    "pad_no",
+    "volume",
+    "height",
+    "area",
+    "offset_x",
+    "offset_y",
+    "pad_result",
+    "pcb_result",
+    "is_defect",
+    "inspection_date",
+    "source_file",
   ],
 };
+``

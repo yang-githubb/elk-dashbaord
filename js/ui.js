@@ -298,46 +298,110 @@
       return mid?.[1] ?? null;
     },
 
+    // resolveBoardSerial(bucket) {
+    //   const kpi = D.getKpi();
+    //   const hit = bucket.top_serial?.hits?.hits?.[0];
+    //   const src = hit?._source ?? {};
+
+    //   const sourceKeys = kpi.serialSourceFields || [D.getFields().serial, "barcode"];
+    //   for (const key of sourceKeys) {
+    //     if (key === "source_file") continue;
+    //     const value = src[key];
+    //     if (value != null && String(value).trim()) return formatSerial(value);
+    //   }
+
+    //   const fromFile = D.transform.barcodeFromPath(src.source_file);
+    //   if (fromFile) return fromFile;
+
+    //   const fromId = D.transform.barcodeFromPath(hit?._id);
+    //   if (fromId) return fromId;
+
+    //   const key = bucket.key?.board;
+    //   if (key != null && String(key).trim()) return formatSerial(key);
+    //   return "—";
+    // },
     resolveBoardSerial(bucket) {
-      const kpi = D.getKpi();
-      const hit = bucket.top_serial?.hits?.hits?.[0];
-      const src = hit?._source ?? {};
-
-      const sourceKeys = kpi.serialSourceFields || [D.getFields().serial, "barcode"];
-      for (const key of sourceKeys) {
-        if (key === "source_file") continue;
-        const value = src[key];
-        if (value != null && String(value).trim()) return formatSerial(value);
-      }
-
-      const fromFile = D.transform.barcodeFromPath(src.source_file);
-      if (fromFile) return fromFile;
-
-      const fromId = D.transform.barcodeFromPath(hit?._id);
-      if (fromId) return fromId;
 
       const key = bucket.key?.board;
-      if (key != null && String(key).trim()) return formatSerial(key);
+
+      if (key != null && String(key).trim()) {
+          return formatSerial(key);
+      }
+
       return "—";
     },
 
     boardBucketToRow(bucket) {
-      const hasNg = (bucket.has_ng?.doc_count ?? 0) > 0;
-      const latest = bucket.latest?.value;
-      const topResult = bucket.top_result?.buckets?.[0]?.key;
-      const hit = bucket.top_serial?.hits?.hits?.[0]?._source;
-      const machine =
-        bucket.top_machine?.buckets?.[0]?.key ?? hit?.tester_name ?? hit?.machine ?? null;
 
-      return {
-        serial: D.transform.resolveBoardSerial(bucket),
-        model: bucket.top_model?.buckets?.[0]?.key ?? null,
-        line: bucket.top_line?.buckets?.[0]?.key ?? null,
-        machine,
-        timestamp: latest != null ? (typeof latest === "number" ? new Date(latest).toISOString() : latest) : null,
-        pad_count: bucket.pad_count?.value ?? bucket.doc_count ?? 0,
-        result: hasNg ? "FAIL" : topResult != null ? D.normalizeResult(topResult) : "PASS",
-      };
+        const hasPadFail =
+            (bucket.has_pad_fail?.doc_count ?? 0) > 0;
+
+        const latest =
+            bucket.latest?.value;
+
+        const topResult =
+            bucket.top_result?.buckets?.[0]?.key;
+
+        const machine =
+            bucket.top_machine?.buckets?.[0]?.key ??
+            null;
+
+        let result;
+
+        if (hasPadFail) {
+
+            result = "FAIL";
+
+        } else if (topResult === "GOOD") {
+
+            result = "GOOD";
+
+        } else if (
+            topResult === "PASS" ||
+            topResult === "WARNING"
+        ) {
+
+            result = "PASS";
+
+        } else if (topResult === "NG") {
+
+            result = "FAIL";
+
+        } else {
+
+            result = "PASS";
+        }
+
+        return {
+            serial:
+                D.transform.resolveBoardSerial(bucket),
+
+            model:
+                bucket.top_model?.buckets?.[0]?.key ??
+                null,
+
+            line:
+                bucket.top_line?.buckets?.[0]?.key ??
+                null,
+
+            machine,
+
+            timestamp:
+                latest != null
+                    ? (
+                        typeof latest === "number"
+                            ? new Date(latest).toISOString()
+                            : latest
+                      )
+                    : null,
+
+            pad_count:
+                bucket.pad_count?.value ??
+                bucket.doc_count ??
+                0,
+
+            result
+        };
     },
 
     hitToPadRow(hit) {

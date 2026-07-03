@@ -122,6 +122,15 @@
         <span class="panel-hint">Click a serial to view pad inspection data</span>
         <span id="loading-tag" class="loading-tag hidden">Updating…</span>
       </div>
+      
+      <div class="board-toolbar">
+          <input
+              type="text"
+              id="board-search"
+              class="search-box"
+              placeholder="Search board serial..."
+          />
+      </div>
 
       <div class="table-wrap">
         <table>
@@ -141,11 +150,19 @@
       <div class="panel-head panel-head-split">
         <div class="panel-head-left">
           <button type="button" id="back-boards" class="btn btn-back">← Boards</button>
+          <button type="button" id="export-board" class="btn">Export Excel</button>
           <h2 id="pad-detail-heading">Pads for <span id="pad-serial-label" class="serial-label"></span></h2>
         </div>
         <span id="pad-loading-tag" class="loading-tag hidden">Loading…</span>
       </div>
-
+            <div class="pad-toolbar">
+          <input
+              type="text"
+              id="pad-search"
+              class="search-box"
+              placeholder="Search pad, component, result..."
+          />
+      </div>
       <div class="table-wrap">
         <table>
           <thead id="pad-thead"></thead>
@@ -162,13 +179,14 @@
   </main>
 
   <!-- Config (order matters) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="config/environments.js"></script>
   <script src="config/schema.spi.js"></script>
   <script src="config/schema.aoi.js"></script>
   <script src="config/settings.js"></script>
   <script src="config.js"></script>
   <script src="config/bootstrap.js"></script>
-
+  
   <!-- App -->
   <script src="js/config-access.js"></script>
   <script src="js/es-queries.js"></script>
