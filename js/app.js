@@ -69,67 +69,103 @@
   }
 
   async function computeBoardKpi(signal) {
-    const start = performance.now();
-    try {
-       const kpi = D.getKpi();
 
-           
-      console.log(
-          "KPI serial field:",
-          kpi.serialField
-      );
+      const start = performance.now();
 
-      console.log(
-          "KPI fail field:",
-          kpi.boardFailField
-      );
-    const res = await esClient.search(
-      {
-        size: 0,
-        query: esQueries.buildEsQuery(esQueries.buildEsFilters()),
-        aggs: {
-          total_boards: {
-            cardinality: {
-              field: kpi.serialField,
-              precision_threshold: 100
-            }
-          },
-          fail_boards: {
-            filter: {
-              terms: {
-                [kpi.boardFailField]: kpi.boardFail
+      try {
+
+          const kpi = D.getKpi();
+
+          console.log(
+              "KPI serial field:",
+              kpi.serialField
+          );
+
+          console.log(
+              "KPI fail field:",
+              kpi.boardFailField
+          );
+
+          let boardGood = 0;
+          let boardPass = 0;
+          let boardFail = 0;
+
+          let afterKey = null;
+
+          do {
+
+              const res = await esClient.search(
+                  esQueries.buildBoardKpiAgg(afterKey),
+                  signal
+              );
+
+              const buckets =
+                  res.aggregations?.boards?.buckets ?? [];
+
+              for (const bucket of buckets) {
+
+                  const hasPadFail =
+                      (bucket.has_pad_fail?.doc_count ?? 0) > 0;
+
+                  const topResult =
+                      bucket.top_result?.buckets?.[0]?.key;
+
+                  if (hasPadFail) {
+
+                      boardFail++;
+
+                  } else if (topResult === "GOOD") {
+
+                      boardGood++;
+
+                  } else if (
+                      topResult === "PASS" ||
+                      topResult === "WARNING"
+                  ) {
+
+                      boardPass++;
+
+                  } else if (topResult === "NG") {
+
+                      boardFail++;
+
+                  } else {
+
+                      boardPass++;
+                  }
               }
-            },
-            aggs: {
-              count: {
-                cardinality: {
-                  field: kpi.serialField,
-                  precision_threshold: 100
-                }
-              }
-            }
-          }
-        }
-      },
-      signal
-    );
 
-    const boardCount = res.aggregations.total_boards?.value ?? 0;
-    const boardFail = res.aggregations.fail_boards?.count?.value ?? 0;
-    const boardPass = boardCount - boardFail;
-    return {
-      boardCount,
-      boardPass,
-      boardFail,
-      boardYield: boardCount ? (boardPass / boardCount) * 100 : 0
-    };
-    } finally {
-      console.log(
-        "computeBoardKpi:",
-        (performance.now() - start).toFixed(0),
-        "ms"
-      );
-    }
+              afterKey =
+                  res.aggregations?.boards?.after_key ?? null;
+
+          } while (afterKey);
+
+          const boardCount =
+              boardGood +
+              boardPass +
+              boardFail;
+
+          const boardYield =
+              boardCount > 0
+                  ? (boardGood / boardCount) * 100
+                  : 0;
+
+          return {
+              boardCount,
+              boardGood,
+              boardPass,
+              boardFail,
+              boardYield
+          };
+
+      } finally {
+
+          console.log(
+              "computeBoardKpi:",
+              (performance.now() - start).toFixed(0),
+              "ms"
+          );
+      }
   }
 
   async function loadFilters() {

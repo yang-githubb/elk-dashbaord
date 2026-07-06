@@ -250,42 +250,159 @@
     },
 
     applyKpis(aggRes, boardKpi) {
+
       const aggs = aggRes.aggregations ?? {};
-      const good = aggs.count_good?.doc_count ?? 0;
-      const pass = aggs.count_pass?.doc_count ?? 0;
-      const fail = aggs.count_fail?.doc_count ?? 0;
-      const total = good + pass + fail;
-      const padYield = total ? ((good + pass) / total) * 100 : 0;
-      const colors = D.getResultColors();
 
-      this.setText("kpi-board-count", boardKpi.boardCount.toLocaleString());
-      this.setText("kpi-board-pass", boardKpi.boardPass.toLocaleString());
-      this.setText("kpi-board-fail", boardKpi.boardFail.toLocaleString());
-      this.setText("kpi-board-yield", `${boardKpi.boardYield.toFixed(2)}%`);
+      const good =
+          aggs.count_good?.doc_count ?? 0;
 
-      this.setText("kpi-pad-count", total.toLocaleString());
-      this.setText("kpi-pad-pass", pass.toLocaleString());
-      this.setText("kpi-pad-fail", fail.toLocaleString());
-      this.setText("kpi-pad-yield", `${padYield.toFixed(2)}%`);
+      const pass =
+          aggs.count_pass?.doc_count ?? 0;
 
-      const boardEl = $("chart-board");
-      const padEl = $("chart-pad");
-      const boardCounts = { PASS: boardKpi.boardPass, FAIL: boardKpi.boardFail };
-      const padCounts = { GOOD: good, PASS: pass, FAIL: fail };
+      const fail =
+          aggs.count_fail?.doc_count ?? 0;
 
-      boardEl.innerHTML = Object.values(boardCounts).some((v) => v > 0)
-        ? `<div class="pie-center">${pieHtml(boardCounts, ["PASS", "FAIL"], { PASS: "Pass", FAIL: "Fail" }, "lg", colors)}</div>`
-        : '<p class="empty-note">No data for selected filters.</p>';
+      const total =
+          good + pass + fail;
 
-      padEl.innerHTML = Object.values(padCounts).some((v) => v > 0)
-        ? `<div class="pie-center">${pieHtml(padCounts, ["GOOD", "PASS", "FAIL"], { GOOD: "Good", PASS: "Pass", FAIL: "Fail" }, "lg", colors)}</div>`
-        : '<p class="empty-note">No data for selected filters.</p>';
+      const padYield =
+          total > 0
+              ? (good / total) * 100
+              : 0;
 
-      this.updateModeLabel(total, boardKpi.boardCount);
-      this.setText("updated", `Updated ${formatTime(new Date())}`);
-    },
-  };
+      const colors =
+          D.getResultColors();
 
+      // =========================
+      // BOARD KPI CARDS
+      // =========================
+
+      this.setText(
+          "kpi-board-count",
+          (boardKpi.boardCount ?? 0).toLocaleString()
+      );
+
+      this.setText(
+          "kpi-board-good",
+          (boardKpi.boardGood ?? 0).toLocaleString()
+      );
+
+      this.setText(
+          "kpi-board-pass",
+          (boardKpi.boardPass ?? 0).toLocaleString()
+      );
+
+      this.setText(
+          "kpi-board-fail",
+          (boardKpi.boardFail ?? 0).toLocaleString()
+      );
+
+      this.setText(
+          "kpi-board-yield",
+          `${(boardKpi.boardYield ?? 0).toFixed(2)}%`
+      );
+
+      // =========================
+      // PAD KPI CARDS
+      // =========================
+
+      this.setText(
+          "kpi-pad-count",
+          total.toLocaleString()
+      );
+
+      this.setText(
+          "kpi-pad-good",
+          good.toLocaleString()
+      );
+
+      this.setText(
+          "kpi-pad-fail",
+          fail.toLocaleString()
+      );
+
+      this.setText(
+          "kpi-pad-yield",
+          `${padYield.toFixed(2)}%`
+      );
+
+      // =========================
+      // CHART DATA
+      // =========================
+
+      const boardEl =
+          $("chart-board");
+
+      const padEl =
+          $("chart-pad");
+
+      const boardCounts = {
+          GOOD: boardKpi.boardGood ?? 0,
+          PASS: boardKpi.boardPass ?? 0,
+          FAIL: boardKpi.boardFail ?? 0
+      };
+
+      const padCounts = {
+          GOOD: good,
+          FAIL: fail
+      };
+
+      // =========================
+      // BOARD CHART
+      // =========================
+
+      boardEl.innerHTML =
+          Object.values(boardCounts).some(v => v > 0)
+              ? `<div class="pie-center">${
+                  pieHtml(
+                      boardCounts,
+                      ["GOOD", "PASS", "FAIL"],
+                      {
+                          GOOD: "Good",
+                          PASS: "Pass",
+                          FAIL: "Fail"
+                      },
+                      "lg",
+                      colors
+                  )
+              }</div>`
+              : '<p class="empty-note">No data for selected filters.</p>';
+
+      // =========================
+      // PAD CHART
+      // =========================
+
+      padEl.innerHTML =
+          Object.values(padCounts).some(v => v > 0)
+              ? `<div class="pie-center">${
+                  pieHtml(
+                      padCounts,
+                      ["GOOD", "FAIL"],
+                      {
+                          GOOD: "Good",
+                          FAIL: "Fail"
+                      },
+                      "lg",
+                      colors
+                  )
+              }</div>`
+              : '<p class="empty-note">No data for selected filters.</p>';
+
+      // =========================
+      // FOOTER
+      // =========================
+
+      this.updateModeLabel(
+          total,
+          boardKpi.boardCount ?? 0
+      );
+
+      this.setText(
+          "updated",
+          `Updated ${formatTime(new Date())}`
+      );
+  },
+  }
   D.transform = {
     barcodeFromPath(path) {
       if (!path) return null;
