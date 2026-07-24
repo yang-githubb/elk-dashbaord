@@ -19,7 +19,7 @@
     abort: null,
     padSearch: "",
     boardSearch: "",
-    paretoVisible: false,
+    paretoVisible: true,
   };
 
   updatePadPanelVisibility();
@@ -666,7 +666,6 @@
 
   function backToBoards() {
     D.state.selectedSerial = null;
-    D.state.paretoVisible = false;
     resetPadPaging();
     ui.showBoardView();
     loadDashboard();
@@ -727,10 +726,6 @@
   ui.$("refresh").addEventListener("click", () => loadDashboard());
   ui.$("retry").addEventListener("click", () => loadDashboard());
   ui.$("back-boards").addEventListener("click", backToBoards);
-  ui.$("pareto-toggle")?.addEventListener("click", () => {
-    D.state.paretoVisible = !D.state.paretoVisible;
-    ui.setParetoPanelVisible(D.state.paretoVisible);
-  });
 
   let padSearchTimer;
 

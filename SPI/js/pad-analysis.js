@@ -120,6 +120,14 @@ function buildAggregations() {
                 order: {
                     _count: "desc"
                 }
+            },
+            aggs: {
+                lines: {
+                    terms: {
+                        field: "line.keyword",
+                        size: 20
+                    }
+                }
             }
         },
 
@@ -188,6 +196,70 @@ function renderTable(
 
 }
 
+function renderModelLineMatrix(modelBuckets) {
+
+    const thead =
+        document.getElementById("model-failure-thead");
+
+    const tbody =
+        document.getElementById("model-failure-tbody");
+
+    if (!thead || !tbody) {
+        return;
+    }
+
+    const allLines = [
+        ...new Set(
+            modelBuckets.flatMap(
+                model =>
+                    (model.lines?.buckets || [])
+                        .map(line => line.key)
+            )
+        )
+    ].sort();
+
+    thead.innerHTML = `
+        <tr>
+            <th>Model</th>
+            ${allLines.map(line => `<th>${line}</th>`).join("")}
+            <th>Total</th>
+        </tr>
+    `;
+
+    tbody.innerHTML =
+        modelBuckets
+            .map(model => {
+
+                const lineMap = {};
+
+                (model.lines?.buckets || [])
+                    .forEach(line => {
+                        lineMap[line.key] =
+                            line.doc_count;
+                    });
+
+                const cells =
+                    allLines
+                        .map(line => `
+                            <td>
+                                ${(lineMap[line] || 0).toLocaleString()}
+                            </td>
+                        `)
+                        .join("");
+
+                return `
+                    <tr>
+                        <td>${model.key}</td>
+                        ${cells}
+                        <td>
+                            ${model.doc_count.toLocaleString()}
+                        </td>
+                    </tr>
+                `;
+            })
+            .join("");
+}
+
 /* ==========================================
  * Load Analysis
  * ========================================== */
@@ -229,10 +301,7 @@ async function loadAnalysis() {
             response.aggregations?.lines?.buckets || []
         );
 
-        renderTable(
-            "model-failure-thead",
-            "model-failure-tbody",
-            "Model",
+        renderModelLineMatrix(
             response.aggregations?.models?.buckets || []
         );
 

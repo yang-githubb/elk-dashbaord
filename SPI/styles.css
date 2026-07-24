@@ -202,7 +202,7 @@ body {
 }
 
 .pareto-bar-label {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   fill: var(--muted);
 }
 
@@ -611,27 +611,29 @@ td {
 #back-dashboard:active {
     transform: translateY(1px);
 }
-
 /* =========================================================
-   PREMIUM OVERVIEW CARDS
+   OVERVIEW CARD STYLING
    ========================================================= */
 
 .overview-card {
-    background:
-        linear-gradient(
-            180deg,
-            #18263e 0%,
-            #132036 100%
-        );
+    background: linear-gradient(
+        180deg,
+        #18263e 0%,
+        #132036 100%
+    );
 
     border: 1px solid #294166;
     border-radius: 14px;
     overflow: hidden;
 
     transition:
-        transform .25s ease,
-        box-shadow .25s ease,
-        border-color .25s ease;
+        transform 0.25s ease,
+        box-shadow 0.25s ease,
+        border-color 0.25s ease;
+}
+
+.overview-card-clickable {
+    cursor: pointer;
 }
 
 .overview-card-clickable:hover {
@@ -652,33 +654,34 @@ td {
 .overview-title {
     font-size: 2rem;
     font-weight: 800;
-    color: white;
+    color: #ffffff;
 }
 
-/* ==========================================
+/* =========================================================
    BODY
-   ========================================== */
+   ========================================================= */
 
 .overview-body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    padding: 32px;
-
-    gap: 24px;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 40px;
+    align-items: start;
+    padding: 24px;
 }
 
-/* ==========================================
-   YIELD
-   ========================================== */
+/* =========================================================
+   LEFT SIDE
+   ========================================================= */
 
 .overview-left {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
 
-    gap: 10px;
+    gap: 16px;
+
+    min-width: 260px;
 }
 
 .overview-yield-block {
@@ -688,59 +691,62 @@ td {
 }
 
 .overview-yield {
-    font-size: 6rem;
+    font-size: 4rem;
     font-weight: 900;
     line-height: 1;
-
-    letter-spacing: -4px;
 }
 
 .overview-subtitle {
     margin-top: 8px;
 
-    font-size: .95rem;
+    font-size: 0.95rem;
+    font-weight: 600;
 
     text-transform: uppercase;
-
     letter-spacing: 2px;
 
     color: var(--muted);
 }
 
-/* ==========================================
-   DONUT
-   ========================================== */
+/* =========================================================
+   PIE CHART
+   ========================================================= */
 
-.overview-donut-wrap {
-    margin-top: 8px;
+.overview-pie-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.overview-donut {
-    width: 280px;
-    height: 280px;
-    display: block;
+.overview-pie {
+    width: 220px;
+    height: 220px;
+
+    min-width: 220px;
+    min-height: 220px;
+    border-radius: 50%;
+
+    box-shadow:
+        0 10px 20px rgba(0,0,0,.25),
+        inset 0 0 1px rgba(255,255,255,.2);
 }
 
-/* ==========================================
-   STATS
-   ========================================== */
+/* =========================================================
+   RIGHT SIDE
+   ========================================================= */
 
 .overview-stats {
     width: 100%;
-    margin-top: 8px;
 }
 
 .overview-stat {
     display: flex;
-
     justify-content: space-between;
-
     align-items: center;
 
     padding: 16px 0;
 
-    border-bottom:
-        1px solid rgba(255,255,255,.08);
+    border-bottom: 1px solid rgba(255,255,255,.08);
 }
 
 .overview-stat:last-child {
@@ -749,50 +755,69 @@ td {
 
 .overview-stat-label {
     color: #90a4c3;
-
     font-size: 1rem;
-
-    font-weight: 500;
 }
 
 .overview-stat-value {
     color: white;
-
     font-family: var(--mono);
-
-    font-size: 1.5rem;
-
+    font-size: 1.2rem;
     font-weight: 800;
 }
 
-/* ==========================================
-   PIE CHART
-   ========================================== */
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
 
-.overview-pie-wrap {
-    displa*: flex;
-    justify-content: cente*;
-    align-items: center;
+@media (max-width: 1200px) {
+
+    .overview-body {
+        grid-template-columns: 1fr;
+    }
+
+    .overview-left {
+        min-width: auto;
+    }
+
 }
 
-.ove*view-pie {
-    width: 260px;
-    h*ight: 260px;
-    border-radius: 50*;
+/* =========================================================
+   OVERVIEW GRID
+   ========================================================= */
 
-    box-shadow:
-        0 12px *0px rgba(0,0,0,.35),
-        inset*0 0 1px rgba(255,255,255,.2);
+.overview-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 20px !important;
+    width: 100% !important;
+}
 
-   *transition:
-        transform .2s *ase,
-        box-shadow .2s ease;
-*
+#board-overview-card,
+#pad-overview-card {
+    width: 100%;
+    min-width: 0;
+}
 
-.overview-card:hover .overview-p*e {
-    transform: scale(1.04);
+@media screen and (max-width: 768px) {
+    .overview-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
 
- *  box-shadow:
-        0 18px 36px *gba(0,0,0,.40),
-        0 0 20px r*ba(59,130,246,.15);
+.overview-body {
+    display: grid !important;
+    grid-template-columns: 320px minmax(0, 1fr) !important;
+    gap: 40px !important;
+    align-items: center !important;
+}
+
+.overview-left {
+    width: 320px !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+.overview-stats {
+    width: 100% !important;
 }

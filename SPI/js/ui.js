@@ -84,60 +84,61 @@
     `;
   }
 
-  function buildPieSvg(percent, color) {
+  function buildPieSvg(good, pass, fail) {
 
-    const good = Math.max(0, Math.min(100, percent));
-    const bad = 100 - good;
+    const total = good + pass + fail;
+
+    if (!total) {
+      return `
+            <div class="overview-pie-wrap">
+                <div
+                    class="overview-pie"
+                    style="background:rgba(255,255,255,0.08)"
+                ></div>
+            </div>
+        `;
+    }
+
+    const goodPct = (good / total) * 100;
+    const passPct = (pass / total) * 100;
+    const failPct = (fail / total) * 100;
 
     return `
-        <div class="pie-chart-container">
+        <div class="overview-pie-wrap">
             <div
-                class="pie-chart"
+                class="overview-pie"
                 style="
                     background:
                     conic-gradient(
-                        ${color} 0% ${good}%,
-                        rgba(255,255,255,0.12) ${good}% 100%
+                        #22c55e 0% ${goodPct}%,
+                        #f59e0b ${goodPct}% ${goodPct + passPct}%,
+                        #ef4444 ${goodPct + passPct}% 100%
                     );
                 "
             ></div>
         </div>
     `;
   }
-  
+
   function buildOverviewCard({
     title,
     yieldValue,
     yieldColor,
-    stats,
+    goodCount,
+    passCount,
+    failCount,
+    stats
   }) {
     return `
     <div class="overview-body">
 
       <!-- Left Side -->
-      <div class="overview-left">
-
-        <div class="overview-yield-block">
-
-          <div
-            class="overview-yield"
-            style="color:${yieldColor};"
-          >
-            ${yieldValue.toFixed(2)}%
-          </div>
-
-          <div class="overview-subtitle">
-            Yield
-          </div>
-
-        </div>
-
-        <div class="overview-donut-wrap">
-          ${buildDonutSvg(yieldValue, yieldColor)}
-        </div>
-
-      </div>
-
+<div class="overview-left">
+${buildPieSvg(
+      goodCount,
+      passCount,
+      failCount
+    )}</div>
       <!-- Right Side -->
       <div class="overview-stats">
 
@@ -150,10 +151,11 @@
                   ${stat.label}
                 </span>
 
-                <span class="overview-stat-value">
-                  ${formatCount(stat.value)}
-                </span>
-
+<span class="overview-stat-value">
+  ${typeof stat.value === "string"
+              ? stat.value
+              : formatCount(stat.value)}
+</span>
               </div>
             `
         )
@@ -335,13 +337,6 @@
       });
     },
 
-    setParetoPanelVisible(visible) {
-      const panel = $("pareto-panel");
-      const button = $("pareto-toggle");
-      if (panel) panel.classList.toggle("hidden", !visible);
-      if (button) button.textContent = visible ? "Hide Failure Pareto" : "View Failure Pareto";
-    },
-
     renderParetoChart(counts) {
       const colors = D.getResultColors();
       const items = Object.entries(counts)
@@ -356,9 +351,15 @@
       const maxCount = items[0][1] || 1;
       const barCount = items.length;
       const barWidth = Math.max(60, Math.floor(480 / barCount));
-      const chartWidth = Math.min(960, barCount * barWidth + 140);
+      const chartWidth = Math.min(1500, barCount * barWidth + 140);
+
       const chartHeight = 300;
-      const padding = { left: 90, right: 70, top: 36, bottom: 110 };
+      const padding = {
+        left: 90,
+        right: 70,
+        top: 36,
+        bottom: 100
+      };
       const innerWidth = chartWidth - padding.left - padding.right;
       const innerHeight = chartHeight - padding.top - padding.bottom;
 
@@ -379,15 +380,15 @@
         y: padding.top + innerHeight - fraction * innerHeight,
       }));
 
-      const xLabelAngle = barCount > 6 ? -45 : 0;
+      const xLabelAngle = 0;
 
       return `
         <div class="pareto-chart-card">
           <svg viewBox="0 0 ${chartWidth} ${chartHeight}" class="pareto-svg">
             <defs>
               <linearGradient id="pareto-line-gradient" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="#f59e0b" />
-                <stop offset="100%" stop-color="#eab308" />
+                <stop offset="0%" stop-color="#ffffff" />
+                <stop offset="100%" stop-color="#ffffff" />
               </linearGradient>
             </defs>
             <rect x="${padding.left}" y="${padding.top}" width="${innerWidth}" height="${innerHeight}" fill="none" stroke="rgba(148, 163, 184, 0.2)" />
@@ -407,8 +408,13 @@
             const columnWidth = innerWidth / barCount - 12;
             const height = (count / maxCount) * innerHeight;
             const y = padding.top + innerHeight - height;
-            const fill = colors[key] || colors.FAIL || "#ef4444";
+            const fill = "#074f89";
+            const label = key
+              .toLowerCase()
+              .replaceAll("_", " ")
+              .replace(/\b\w/g, c => c.toUpperCase());
 
+            const words = label.split(" ");
             return `
     <g
         class="pareto-bar"
@@ -424,22 +430,20 @@
                     rx="6"
                 />
                 <text
-                    x="${x + columnWidth / 2}"
-                    y="${y - 10}"
-                    text-anchor="middle"
-                    class="pareto-bar-value"
-                >
-                    ${formatCount(count)}
-                </text>
-                <text
-                    x="${x + columnWidth / 2}"
-                    y="${padding.top + innerHeight + 28}"
-                    text-anchor="middle"
-                    class="pareto-bar-label"
-                    transform="rotate(${xLabelAngle} ${x + columnWidth / 2} ${padding.top + innerHeight + 28})"
-                >
-                    ${key}
-                </text>
+    x="${x + columnWidth / 2}"
+    y="${padding.top + innerHeight + 25}"
+    text-anchor="middle"
+    class="pareto-bar-label"
+>
+    ${words.map((word, i) => `
+        <tspan
+            x="${x + columnWidth / 2}"
+            dy="${i === 0 ? 0 : 16}"
+        >
+            ${word}
+        </tspan>
+    `).join("")}
+</text>
             </g>
         `;
           })
@@ -448,14 +452,21 @@
             ${linePoints
           .map(
             (point) => `
-              <circle cx="${point.x}" cy="${point.y}" r="5" fill="#f59e0b" stroke="#fff" stroke-width="2" />
+              <circle cx="${point.x}" cy="${point.y}" r="5" fill="#074f89" stroke="#fff" stroke-width="2" />
               <text x="${point.x}" y="${point.y - 12}" text-anchor="middle" class="pareto-line-label">${((point.cumulative / total) * 100).toFixed(0)}%</text>
             `
           )
           .join("")}
             <line x1="${padding.left}" x2="${padding.left}" y1="${padding.top}" y2="${padding.top + innerHeight}" stroke="rgba(148, 163, 184, 0.35)" />
             <line x1="${chartWidth - padding.right}" x2="${chartWidth - padding.right}" y1="${padding.top}" y2="${padding.top + innerHeight}" stroke="rgba(148, 163, 184, 0.35)" />
-            <text x="${padding.left + innerWidth / 2}" y="${chartHeight - 18}" text-anchor="middle" class="pareto-axis-label">Types of defects</text>
+<text
+    x="${padding.left + innerWidth / 2}"
+    y="${padding.top + innerHeight + 80}"
+    text-anchor="middle"
+    class="pareto-axis-label"
+>
+    Types of defects
+</text>
             <text x="${padding.left - 52}" y="${padding.top + innerHeight / 2}" transform="rotate(-90 ${padding.left - 52} ${padding.top + innerHeight / 2})" text-anchor="middle" class="pareto-axis-label">Frequency</text>
             <text x="${chartWidth - padding.right + 42}" y="${padding.top + innerHeight / 2}" transform="rotate(-90 ${chartWidth - padding.right + 42} ${padding.top + innerHeight / 2})" text-anchor="middle" class="pareto-axis-label">% of defects</text>
           </svg>
@@ -464,17 +475,18 @@
     },
 
     updateParetoChart(counts) {
-      const button = $("pareto-toggle");
-      const chart = $("pareto-chart");
-      const panel = $("pareto-panel");
-      if (!button || !chart) return;
 
+      const chart = $("pareto-chart");
+
+      if (!chart) {
+        return;
+      }
       const hasFailures = Object.values(counts).some((value) => value > 0);
-      button.classList.toggle("hidden", !hasFailures);
 
       if (!hasFailures) {
-        chart.innerHTML = '<p class="empty-note">No pad failures found for the current selection.</p>';
-        this.setParetoPanelVisible(false);
+        chart.innerHTML =
+          '<p class="empty-note">No pad failures found for the current selection.</p>';
+
         return;
       }
 
@@ -507,9 +519,7 @@
 
           });
 
-        }); if (panel && !panel.classList.contains("hidden")) {
-          this.setParetoPanelVisible(true);
-        }
+        });
     },
 
     applyKpis(aggRes, padFailureCounts = {}) {
@@ -595,6 +605,11 @@
           title: "Board Overview",
           yieldValue: boardYield,
           yieldColor: boardYieldColor,
+
+          goodCount: boardGood,
+          passCount: boardPass,
+          failCount: boardFail,
+
           stats: [
             {
               label: "Total",
@@ -611,6 +626,10 @@
             {
               label: "Fail",
               value: boardFail
+            },
+            {
+              label: "Yield",
+              value: `${boardYield.toFixed(2)}%`
             }
           ]
         });
@@ -620,6 +639,9 @@
           title: "Pad Overview",
           yieldValue: padYield,
           yieldColor: padYieldColor,
+          goodCount: good,
+          passCount: 0,
+          failCount: fail,
           stats: [
             {
               label: "Total",
@@ -632,6 +654,10 @@
             {
               label: "Fail",
               value: fail
+            },
+            {
+              label: "Yield",
+              value: `${padYield.toFixed(2)}%`
             }
           ]
         });
