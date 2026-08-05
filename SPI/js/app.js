@@ -3,9 +3,10 @@
  */
 (function (D) {
   const { ui, esClient, esQueries, transform } = D;
+  const config = D.config || {};
 
   D.state = {
-    time: D.config.defaultTimeRange || "all",
+    time: config.defaultTimeRange || "all",
     line: "",
     model: "",
     view: "dashboard",
@@ -62,31 +63,41 @@
     const fields = D.getFields();
     const filters = [];
 
-    if (!esQueries.isAllTime()) {
-      filters.push({ range: { [fields.time]: { gte: D.config.esTimeRanges[D.state.time] } } });
+    const timeField = fields.time;
+    if (!esQueries.isAllTime() && timeField) {
+      filters.push({ range: { [timeField]: { gte: D.config.esTimeRanges[D.state.time] } } });
     }
 
-    filters.push({
-      term: {
-        [D.esField(fields.station)]: "SPI"
-      }
-    });
+    const stationField = D.esField(fields.station);
+    if (stationField) {
+      filters.push({
+        term: {
+          [stationField]: D.config.stationValue || "SPI"
+        }
+      });
+    }
+
+    const lineField = D.esField(fields.line);
+    const modelField = D.esField(fields.model);
 
     const res = await esClient.search({
       size: 0,
       query: esQueries.buildEsQuery(filters),
       aggs: {
-        lines: { terms: { field: D.esField(fields.line), size: 200, order: { _key: "asc" } } },
-        models: { terms: { field: D.esField(fields.model), size: 200, order: { _key: "asc" } } },
+        lines: lineField ? { terms: { field: lineField, size: 200, order: { _key: "asc" } } } : { terms: { field: "_id", size: 0 } },
+        models: modelField ? { terms: { field: modelField, size: 200, order: { _key: "asc" } } } : { terms: { field: "_id", size: 0 } },
       },
     });
 
+    const timeSelect = ui.$("time");
     ui.fillSelect(
-      ui.$("time"),
+      timeSelect,
       D.getTimeOrder().map((t) => ({ value: t, label: D.getTimeLabels()[t] || t })),
       (o) => o.label,
     );
-    ui.$("time").value = D.state.time;
+    if (timeSelect) {
+      timeSelect.value = D.state.time;
+    }
 
     const lines = res.aggregations?.lines?.buckets?.map((b) => String(b.key)) ?? [];
     const models = res.aggregations?.models?.buckets?.map((b) => String(b.key)) ?? [];
@@ -106,8 +117,10 @@
 
     const esStart = performance.now();
 
+    const agg = esQueries.buildBoardListAgg(afterKey);
+    console.debug("loadBoardList query", agg);
     const res = await esClient.search(
-      esQueries.buildBoardListAgg(afterKey),
+      agg,
       signal
     );
 
@@ -362,16 +375,18 @@
               const count =
                 result.inspections?.value || 0;
 
-              if (result.key === "GOOD") {
+              const normalized = D.normalizeResult(result.key);
+
+              if (normalized === "GOOD") {
                 good += count;
               }
               else if (
-                result.key === "PASS" ||
-                result.key === "WARNING"
+                normalized === "PASS" ||
+                normalized === "WARNING"
               ) {
                 pass += count;
               }
-              else if (result.key === "NG") {
+              else if (normalized === "FAIL") {
                 fail += count;
               }
             }
@@ -408,16 +423,18 @@
               const count =
                 result.inspections?.value || 0;
 
-              if (result.key === "GOOD") {
+              const normalized = D.normalizeResult(result.key);
+
+              if (normalized === "GOOD") {
                 good += count;
               }
               else if (
-                result.key === "PASS" ||
-                result.key === "WARNING"
+                normalized === "PASS" ||
+                normalized === "WARNING"
               ) {
                 pass += count;
               }
-              else if (result.key === "NG") {
+              else if (normalized === "FAIL") {
                 fail += count;
               }
             }
@@ -481,8 +498,9 @@
 
     D.state.padSearch = "";
 
-    if (ui.$("pad-search")) {
-      ui.$("pad-search").value = "";
+    const padSearchInput = ui.$("pad-search");
+    if (padSearchInput) {
+      padSearchInput.value = "";
     }
 
     ui.showPadView(serial);
@@ -545,48 +563,61 @@
       const originalTimeout = D.config.fetchTimeoutMs;
       const originalPageSize = D.config.pageSize;
       D.config.fetchTimeoutMs = 120_000; // 2 minutes for export
-      D.config.pageSize = 5000; // Large batch size for export
+      D.config.pageSize = 1000; // Large batch size for export
       let pageCount = 0;
 
       const fetchStartTime = performance.now();
+
       try {
+
+        let afterKey = null;
+
         while (true) {
+
           pageCount++;
-          console.log(`[Export] Fetching page ${pageCount} (optimized query)...`);
-          const agg = esQueries.buildBoardListExportAgg(); // Use optimized export query
-          const res = await esClient.search(agg);
-          const buckets = res.aggregations?.boards?.buckets ?? [];
-          console.log(`[Export] Page ${pageCount}: got ${buckets.length} boards`);
 
-          // Extract data from top_hits documents instead of aggregation sub-buckets
-          buckets.forEach((bucket) => {
-            const hit = bucket.latest_doc?.hits?.hits?.[0];
-            if (hit?._source) {
-              const source = hit._source;
-              const row = {};
+          console.log(
+            `[Export] Fetching page ${pageCount}...`
+          );
 
-              // Build row with values from source document for each column
-              for (const col of columns) {
-                const fieldKey = col.key;
-                // Try the field key directly, then try common variants
-                let value = source[fieldKey] ||
-                  source[fields[fieldKey]] ||
-                  (fieldKey === "serial" ? bucket.key : null) ||
-                  "—";
-                row[fieldKey] = value;
-              }
-              rows.push(row);
-            }
+          const res = await esClient.search(
+            esQueries.buildBoardListAgg(afterKey)
+          );
+
+          const buckets =
+            res.aggregations?.boards?.buckets ?? [];
+
+          console.log(
+            `[Export] Page ${pageCount}: got ${buckets.length} boards`
+          );
+
+          buckets.forEach(bucket => {
+
+            rows.push(
+              transform.boardBucketToRow(bucket)
+            );
+
           });
 
-          console.log(`[Export] Total rows so far: ${rows.length}`);
-          // For terms aggregation, pagination happens via bucket offset, not after_key
-          // If we got fewer than pageSize results, we've reached the end
-          if (buckets.length < D.config.pageSize) break;
+          console.log(
+            `[Export] Total rows so far: ${rows.length}`
+          );
+
+          afterKey =
+            res.aggregations?.boards?.after_key;
+
+          if (!afterKey) {
+            break;
+          }
         }
+
       } finally {
-        D.config.fetchTimeoutMs = originalTimeout; // restore original timeout
-        D.config.pageSize = originalPageSize; // restore original page size
+
+        D.config.fetchTimeoutMs =
+          originalTimeout;
+
+        D.config.pageSize =
+          originalPageSize;
       }
       const fetchTime = performance.now() - fetchStartTime;
       console.log(`[Export] Data fetching complete in ${(fetchTime / 1000).toFixed(2)}s. Total rows: ${rows.length}`);
@@ -678,8 +709,8 @@
     ui.$("analysis-panel")
       ?.classList.remove("hidden");
 
-    ui.$("board-panel")
-      ?.classList.add("hidden");
+    ui.$("board-panel")?.
+      classList.add("hidden");
 
     ui.$("pad-panel")
       ?.classList.add("hidden");
@@ -694,8 +725,8 @@
     ui.$("analysis-panel")
       ?.classList.add("hidden");
 
-    ui.$("board-panel")
-      ?.classList.remove("hidden");
+    ui.$("board-panel")?.
+      classList.remove("hidden");
 
     if (D.isPadLevel()) {
       ui.$("pad-panel")
@@ -706,9 +737,9 @@
   }
 
   function onFilterChange() {
-    D.state.time = ui.$("time").value;
-    D.state.line = ui.$("line").value;
-    D.state.model = ui.$("model").value;
+    D.state.time = ui.$("time")?.value ?? D.state.time;
+    D.state.line = ui.$("line")?.value ?? D.state.line;
+    D.state.model = ui.$("model")?.value ?? D.state.model;
 
     D.state.selectedSerial = null;
 
@@ -720,12 +751,12 @@
     loadDashboard();
   }
 
-  ui.$("time").addEventListener("change", onFilterChange);
-  ui.$("line").addEventListener("change", onFilterChange);
-  ui.$("model").addEventListener("change", onFilterChange);
-  ui.$("refresh").addEventListener("click", () => loadDashboard());
-  ui.$("retry").addEventListener("click", () => loadDashboard());
-  ui.$("back-boards").addEventListener("click", backToBoards);
+  ui.$("time")?.addEventListener("change", onFilterChange);
+  ui.$("line")?.addEventListener("change", onFilterChange);
+  ui.$("model")?.addEventListener("change", onFilterChange);
+  ui.$("refresh")?.addEventListener("click", () => loadDashboard());
+  ui.$("retry")?.addEventListener("click", () => loadDashboard());
+  ui.$("back-boards")?.addEventListener("click", backToBoards);
 
   let padSearchTimer;
 
@@ -736,9 +767,9 @@
       clearTimeout(padSearchTimer);
 
       padSearchTimer = setTimeout(() => {
+        const padSearchInput = ui.$("pad-search");
 
-        D.state.padSearch =
-          ui.$("pad-search").value.trim();
+        D.state.padSearch = padSearchInput?.value.trim() || "";
 
         D.state.padPage = 0;
 
@@ -760,29 +791,28 @@
       clearTimeout(boardSearchTimer);
 
       boardSearchTimer = setTimeout(() => {
+        const boardSearchInput = ui.$("board-search");
 
-        D.state.boardSearch =
-          ui.$("board-search").value.trim();
+        D.state.boardSearch = boardSearchInput?.value.trim() || "";
 
         resetBoardPaging();
 
         loadDashboard();
-
       }, 300);
     }
   );
 
-  ui.$("export-board").addEventListener(
+  ui.$("export-board")?.addEventListener(
     "click",
     exportCurrentBoard
   );
 
-  ui.$("export-boards").addEventListener(
+  ui.$("export-boards")?.addEventListener(
     "click",
     exportBoardList
   );
 
-  ui.$("board-prev").addEventListener(
+  ui.$("board-prev")?.addEventListener(
     "click",
     async () => {
 
@@ -797,7 +827,7 @@
     }
   );
 
-  ui.$("board-next").addEventListener(
+  ui.$("board-next")?.addEventListener(
     "click",
     async () => {
 
@@ -815,7 +845,7 @@
     }
   );
 
-  ui.$("pad-prev").addEventListener(
+  ui.$("pad-prev")?.addEventListener(
     "click",
     async () => {
 
@@ -831,7 +861,7 @@
     }
   );
 
-  ui.$("pad-next").addEventListener(
+  ui.$("pad-next")?.addEventListener(
     "click",
     async () => {
 

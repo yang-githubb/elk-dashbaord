@@ -20,7 +20,12 @@
   D.getTimeOrder = () => cfg().timeOrder || [];
   D.getEsTimeRanges = () => cfg().esTimeRanges || {};
 
-  D.esField = (field) => (field.includes(".") ? field : `${field}.keyword`);
+  D.esField = (field) => {
+    if (typeof field !== "string" || !field) {
+      return "";
+    }
+    return field.includes(".") ? field : `${field}.keyword`;
+  };
 
   D.normalizeResult = (value) => {
     const map = cfg().resultMap || {};

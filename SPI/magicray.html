@@ -4,20 +4,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SMT Board Dashboard</title>
+  <title>MagicRay Dashboard</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 
-<body>
+<body class="magicray">
   <header class="header">
     <div class="header-title">
-      <h1>SMT Board Dashboard</h1>
+      <h1>MagicRay Dashboard</h1>
       <span id="status" class="status status-bad">Disconnected</span>
     </div>
 
     <nav class="dashboard-tabs">
-      <a href="index.html" class="dashboard-tab dashboard-tab-active">SPI Dashboard</a>
-      <a href="magicray.html" class="dashboard-tab">MagicRay Dashboard</a>
+      <a href="index.html" class="dashboard-tab">SPI Dashboard</a>
+      <a href="magicray.html" class="dashboard-tab dashboard-tab-active">MagicRay Dashboard</a>
     </nav>
 
     <div class="filters">
@@ -55,89 +55,32 @@
   </div>
 
   <main class="main">
-    <!-- ==========================================
-     OVERVIEW
-========================================== -->
     <section class="overview-section">
-
       <div class="overview-grid">
-
-        <!-- Board Overview -->
         <div id="board-overview-card" class="overview-card overview-card-clickable">
-
           <div class="overview-header">
-            <span class="overview-title">
-              Board Overview
-            </span>
+            <span class="overview-title">Board Overview</span>
           </div>
-
-          <div id="board-overview-content">
-            Loading...
-          </div>
-
+          <div id="board-overview-content">Loading...</div>
         </div>
 
-        <!-- Pad Overview -->
         <div id="pad-overview-card" class="overview-card overview-card-clickable">
-
           <div class="overview-header">
-            <span class="overview-title">
-              Pad Overview
-            </span>
+            <span class="overview-title">Component Overview</span>
           </div>
-
-          <div id="pad-overview-content">
-            Loading...
-          </div>
-
+          <div id="pad-overview-content">Loading...</div>
         </div>
-
       </div>
-
     </section>
 
-    <!-- ==========================================
-     FAILURE PARETO
-========================================== -->
     <section class="panel">
-
-      <div class="panel-head">
-
-        <h3>
-          Pad Failure Pareto Analysis
-        </h3>
-
-      </div>
-
-      <div id="pareto-chart"></div>
-
-    </section>
-    <section id="board-panel" class="panel panel-table">
       <div class="panel-head panel-head-split">
         <div>
-          <h2>Board Serial Numbers</h2>
-          <span class="panel-hint">Click a serial to view pad inspection data</span>
+          <h3>Failure Pareto Analysis</h3>
         </div>
-        <span id="loading-tag" class="loading-tag hidden">Updating…</span>
+        <span id="loading-tag" class="loading-tag hidden">Loading…</span>
       </div>
-
-      <div class="board-toolbar">
-        <input type="text" id="board-search" class="search-box" placeholder="Search board serial..." />
-        <button type="button" id="export-boards" class="btn">Export Boards</button>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead id="board-thead"></thead>
-          <tbody id="board-tbody"></tbody>
-        </table>
-      </div>
-
-      <div class="pager">
-        <button type="button" id="board-prev" class="btn">Previous</button>
-        <span id="board-page-info">Page 1 of 1</span>
-        <button type="button" id="board-next" class="btn">Next</button>
-      </div>
+      <div id="pareto-chart"></div>
     </section>
 
     <section id="pad-panel" class="panel panel-table hidden">
@@ -145,12 +88,12 @@
         <div class="panel-head-left">
           <button type="button" id="back-boards" class="btn btn-back">← Boards</button>
           <button type="button" id="export-board" class="btn">Export Excel</button>
-          <h2 id="pad-detail-heading">Pads for <span id="pad-serial-label" class="serial-label"></span></h2>
+          <h2 id="pad-detail-heading">Components for <span id="pad-serial-label" class="serial-label"></span></h2>
         </div>
         <span id="pad-loading-tag" class="loading-tag hidden">Loading…</span>
       </div>
       <div class="pad-toolbar">
-        <input type="text" id="pad-search" class="search-box" placeholder="Search pad, component, result..." />
+        <input type="text" id="pad-search" class="search-box" placeholder="Search component, result..." />
       </div>
       <div class="table-wrap">
         <table>
@@ -158,7 +101,6 @@
           <tbody id="pad-tbody"></tbody>
         </table>
       </div>
-
       <div class="pager">
         <button type="button" id="pad-prev" class="btn">Previous</button>
         <span id="pad-page-info">Page 1 of 1</span>
@@ -167,23 +109,20 @@
     </section>
   </main>
 
-  <!-- Config (order matters) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="config/environments.js"></script>
-  <script src="config/schema.spi.js"></script>
+  <script src="config/schema.magicray.js"></script>
   <script src="config/settings.js"></script>
   <script>
     window.DASHBOARD_USER_CONFIG = window.DASHBOARD_USER_CONFIG || {};
-    window.DASHBOARD_USER_CONFIG.schema = "SPI";
+    window.DASHBOARD_USER_CONFIG.schema = "MAGICRAY";
   </script>
   <script src="config/bootstrap.js"></script>
 
-  <!-- App -->
   <script src="js/config-access.js"></script>
   <script src="js/es-queries.js"></script>
   <script src="js/es-client.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>
 </body>
-
 </html>

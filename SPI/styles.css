@@ -88,6 +88,36 @@ body {
   min-width: 160px;
 }
 
+.dashboard-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.dashboard-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 14px;
+  font-weight: 600;
+  border-radius: 999px;
+  color: var(--text);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid transparent;
+  text-decoration: none;
+}
+
+.dashboard-tab:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.dashboard-tab-active {
+  background: var(--bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .filter span {
   font-size: 0.75rem;
   font-weight: 500;
@@ -176,6 +206,14 @@ body {
 
 #pareto-chart {
   padding: 16px;
+  min-height: 320px;
+}
+
+.pareto-empty {
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pareto-svg {
@@ -644,6 +682,17 @@ td {
     box-shadow:
         0 20px 40px rgba(0,0,0,.35),
         0 0 30px rgba(59,130,246,.15);
+}
+
+.magicray .overview-card,
+.magicray .overview-card-clickable {
+    cursor: default;
+}
+
+.magicray .overview-card-clickable:hover {
+    border-color: inherit;
+    transform: none;
+    box-shadow: none;
 }
 
 .overview-header {

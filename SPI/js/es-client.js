@@ -42,22 +42,31 @@
         const headers = { "Content-Type": "application/json" };
         if (!usesProxy()) headers.Authorization = authHeader();
 
+        const payload = JSON.stringify(body);
+        console.debug("ES request body:", body);
         const res = await fetch(searchUrl(), {
           method: "POST",
           headers,
-          body: JSON.stringify(body),
+          body: payload,
           signal: controller.signal,
         });
 
-        const data = await res.json();
+        const text = await res.text();
+
         if (!res.ok) {
-          const msg =
-            typeof data.error === "string"
-              ? data.error
-              : data.error?.reason || data.hint || res.statusText;
-          throw new Error(msg);
+
+          console.error(
+            "HTTP Error:",
+            res.status,
+            text
+          );
+
+          throw new Error(
+            `HTTP ${res.status} ${res.statusText}`
+          );
         }
-        return data;
+
+        return JSON.parse(text);
       } finally {
         clearTimeout(timeout);
         signal?.removeEventListener("abort", onAbort);

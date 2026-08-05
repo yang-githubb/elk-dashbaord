@@ -12,6 +12,8 @@ start.bat
 
 Opens http://127.0.0.1:8000/ and connects to Elasticsearch via `proxy.py`. Requires factory VPN. Credentials are in `proxy.py` (or `ES_USERNAME` / `ES_PASSWORD` env vars).
 
+For large queries, you can raise the proxy timeout by setting `ES_TIMEOUT_SEC`.
+
 ## Configuration
 
 | File | What it controls |

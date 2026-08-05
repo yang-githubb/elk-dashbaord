@@ -40,12 +40,14 @@ ES_USERNAME = os.environ.get(
     "ES_USERNAME", "flexh1smtmachinesdata-sac-tst-00589-service-user"
 )
 ES_PASSWORD = os.environ.get("ES_PASSWORD", "f*oA-4cj")
+ES_TIMEOUT_SEC = int(os.environ.get("ES_TIMEOUT_SEC", "300"))
 SEARCH_URL = f"{ES_URL}/{ES_INDEX}/_search"
 
 # Only these paths may be served over HTTP (prevents path traversal)
 ALLOWED_STATIC = frozenset(
     {
         "index.html",
+        "magicray.html",
         "analysis.html",
         "styles.css",
         "config.js",
@@ -76,8 +78,8 @@ def es_request(body: bytes) -> tuple[int, bytes]:
     )
     ctx = ssl.create_default_context()
     try:
-        # Increased timeout to 300 seconds (5 minutes) for large aggregations
-        with urlopen(req, timeout=300, context=ctx) as res:
+        # Increased timeout for large aggregations and heavy queries.
+        with urlopen(req, timeout=ES_TIMEOUT_SEC, context=ctx) as res:
             return res.status, res.read()
     except HTTPError as err:
         return err.code, err.read()
@@ -144,6 +146,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 }
             ).encode()
             print(f"[proxy] ES connection failed: {reason}")
+            self.send_response(502)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(msg)))
+            self.end_headers()
+            self._write_data(msg)
+            return
+        except Exception as err:
+            reason = str(err)
+            msg = json.dumps(
+                {
+                    "error": f"Elasticsearch proxy error: {reason}",
+                    "hint": "Check proxy.py and Elasticsearch availability",
+                    "target": SEARCH_URL,
+                }
+            ).encode()
+            print(f"[proxy] Unexpected proxy error: {reason}")
             self.send_response(502)
             self._cors()
             self.send_header("Content-Type", "application/json")

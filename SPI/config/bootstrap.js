@@ -12,6 +12,11 @@
 
   const envKey = user.environment || Object.keys(environments)[0];
   const env = environments[envKey] || {};
+  const schemaKey = user.schema || "SPI";
+  const schema =
+    window.DASHBOARD_SCHEMAS[schemaKey] ||
+    window.DASHBOARD_SCHEMAS.SPI ||
+    {};
 
   const baseConfig = {
     environment: envKey,
@@ -22,6 +27,7 @@
     index: env.index,
     username: env.username || "",
     password: env.password || "",
+    stationValue: schema.stationValue || schema.station || "SPI",
 
     pageSize: overrides.pageSize ?? settings.pageSize ?? 25,
     compositePageSize: settings.compositePageSize ?? 5000,
@@ -37,7 +43,6 @@
   };
 
   Dashboard.config = baseConfig;
-  const schema = window.DASHBOARD_SCHEMAS.SPI;
 
   Object.assign(Dashboard.config, {
     schemaId: schema.id,

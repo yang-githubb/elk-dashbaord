@@ -7,20 +7,19 @@ window.DASHBOARD_SETTINGS = {
   boardCacheMs: 180_000,
   refreshMs: 120_000,
   healthMs: 60_000,
-  fetchTimeoutMs: 35_000,
-  defaultTimeRange: "all",
+  fetchTimeoutMs: 300_000,
+  defaultTimeRange: "14d",
 
   timeLabels: {
-    all: "All time",
     "15m": "Last 15 minutes",
     "1h": "Last 1 hour",
     "6h": "Last 6 hours",
     "24h": "Last 24 hours",
     "7d": "Last 7 days",
-    "30d": "Last 30 days",
+    "14d": "Last 14 days",
   },
 
-  timeOrder: ["all", "15m", "1h", "6h", "24h", "7d", "30d"],
+  timeOrder: ["15m", "1h", "6h", "24h", "7d", "14d"],
 
   esTimeRanges: {
     "15m": "now-15m",
@@ -28,7 +27,7 @@ window.DASHBOARD_SETTINGS = {
     "6h": "now-6h",
     "24h": "now-24h",
     "7d": "now-7d",
-    "30d": "now-30d",
+    "14d": "now-14d",
   },
 
   resultColors: {

@@ -90,34 +90,33 @@
 
     if (!total) {
       return `
-            <div class="overview-pie-wrap">
-                <div
-                    class="overview-pie"
-                    style="background:rgba(255,255,255,0.08)"
-                ></div>
-            </div>
-        `;
+      <div class="overview-pie-wrap">
+        <div
+          class="overview-pie"
+          style="background:rgba(255,255,255,0.08)"
+        ></div>
+      </div>
+    `;
     }
 
     const goodPct = (good / total) * 100;
     const passPct = (pass / total) * 100;
-    const failPct = (fail / total) * 100;
 
     return `
-        <div class="overview-pie-wrap">
-            <div
-                class="overview-pie"
-                style="
-                    background:
-                    conic-gradient(
-                        #22c55e 0% ${goodPct}%,
-                        #f59e0b ${goodPct}% ${goodPct + passPct}%,
-                        #ef4444 ${goodPct + passPct}% 100%
-                    );
-                "
-            ></div>
-        </div>
-    `;
+    <div class="overview-pie-wrap">
+      <div
+        class="overview-pie"
+        style="
+          background:
+          conic-gradient(
+            #22c55e 0% ${goodPct}%,
+            #f59e0b ${goodPct}% ${goodPct + passPct}%,
+            #ef4444 ${goodPct + passPct}% 100%
+          );
+        "
+      ></div>
+    </div>
+  `;
   }
 
   function buildOverviewCard({
@@ -178,29 +177,38 @@ ${buildPieSvg(
     },
 
     showError(message) {
-      $("error-text").textContent = message;
-      $("error").classList.remove("hidden");
+      const errorText = $("error-text");
+      if (errorText) {
+        errorText.textContent = message;
+      }
+      $("error")?.classList.remove("hidden");
     },
 
     hideError() {
-      $("error").classList.add("hidden");
+      $("error")?.classList.add("hidden");
     },
 
     setLoading(active) {
       const { state, config } = D;
       state.loading = active;
-      $("refresh").disabled = active;
-      $("loading-tag").classList.toggle("hidden", !active || state.view !== "boards");
-      $("pad-loading-tag").classList.toggle("hidden", !active || state.view !== "pads");
+      const refreshButton = $("refresh");
+      if (refreshButton) {
+        refreshButton.disabled = active;
+      }
+      $("loading-tag")?.classList.toggle("hidden", !active || state.view !== "boards");
+      $("pad-loading-tag")?.classList.toggle("hidden", !active || state.view !== "pads");
     },
 
     setStatus(connected) {
       const el = $("status");
-      el.textContent = connected ? "Connected" : "Disconnected";
-      el.className = connected ? "status status-ok" : "status status-bad";
+      if (el) {
+        el.textContent = connected ? "Connected" : "Disconnected";
+        el.className = connected ? "status status-ok" : "status status-bad";
+      }
     },
 
     fillSelect(select, options, labelFn) {
+      if (!select) return;
       const current = select.value;
       select.innerHTML = "";
       for (const opt of options) {
@@ -214,16 +222,16 @@ ${buildPieSvg(
 
     showBoardView() {
       D.state.view = "boards";
-      $("board-panel").classList.remove("hidden");
-      $("pad-panel").classList.add("hidden");
+      $("board-panel")?.classList.remove("hidden");
+      $("pad-panel")?.classList.add("hidden");
     },
 
     showPadView(serial) {
       D.state.view = "pads";
       D.state.selectedSerial = serial;
       this.setText("pad-serial-label", serial);
-      $("board-panel").classList.add("hidden");
-      $("pad-panel").classList.remove("hidden");
+      $("board-panel")?.classList.add("hidden");
+      $("pad-panel")?.classList.remove("hidden");
     },
 
     updateModeSettings() {
@@ -251,20 +259,35 @@ ${buildPieSvg(
     updateBoardPager() {
       const { state } = D;
       this.setText("board-page-info", `Page ${state.boardPage + 1} of ${state.boardTotalPages}`);
-      $("board-prev").disabled = state.boardPage <= 0 || state.loading;
-      $("board-next").disabled = state.boardPage + 1 >= state.boardTotalPages || state.loading;
+      const boardPrev = $("board-prev");
+      const boardNext = $("board-next");
+      if (boardPrev) {
+        boardPrev.disabled = state.boardPage <= 0 || state.loading;
+      }
+      if (boardNext) {
+        boardNext.disabled = state.boardPage + 1 >= state.boardTotalPages || state.loading;
+      }
     },
 
     updatePadPager() {
       const { state } = D;
       this.setText("pad-page-info", `Page ${state.padPage + 1} of ${state.padTotalPages}`);
-      $("pad-prev").disabled = state.padPage <= 0 || state.loading;
-      $("pad-next").disabled = state.padPage + 1 >= state.padTotalPages || state.loading;
+      const padPrev = $("pad-prev");
+      const padNext = $("pad-next");
+      if (padPrev) {
+        padPrev.disabled = state.padPage <= 0 || state.loading;
+      }
+      if (padNext) {
+        padNext.disabled = state.padPage + 1 >= state.padTotalPages || state.loading;
+      }
     },
 
     renderDataTable(theadId, tbodyId, columns, rows, options = {}) {
       const thead = $(theadId);
       const tbody = $(tbodyId);
+      if (!thead || !tbody) {
+        return;
+      }
       thead.innerHTML = "";
       tbody.innerHTML = "";
 
@@ -338,6 +361,7 @@ ${buildPieSvg(
     },
 
     renderParetoChart(counts) {
+      const isMagicRay = D.config.schemaId === "magicray";
       const colors = D.getResultColors();
       const items = Object.entries(counts)
         .filter(([, count]) => count > 0)
@@ -380,8 +404,6 @@ ${buildPieSvg(
         y: padding.top + innerHeight - fraction * innerHeight,
       }));
 
-      const xLabelAngle = 0;
-
       return `
         <div class="pareto-chart-card">
           <svg viewBox="0 0 ${chartWidth} ${chartHeight}" class="pareto-svg">
@@ -409,9 +431,11 @@ ${buildPieSvg(
             const height = (count / maxCount) * innerHeight;
             const y = padding.top + innerHeight - height;
             const fill = "#074f89";
+
             const label = key
               .toLowerCase()
-              .replaceAll("_", " ")
+              .split("_")
+              .join(" ")
               .replace(/\b\w/g, c => c.toUpperCase());
 
             const words = label.split(" ");
@@ -419,7 +443,7 @@ ${buildPieSvg(
     <g
         class="pareto-bar"
         data-failure="${key}"
-        style="cursor:pointer"
+        style="cursor:${isMagicRay ? 'default' : 'pointer'}"
     >
                 <rect
                     x="${x}"
@@ -459,6 +483,7 @@ ${buildPieSvg(
           .join("")}
             <line x1="${padding.left}" x2="${padding.left}" y1="${padding.top}" y2="${padding.top + innerHeight}" stroke="rgba(148, 163, 184, 0.35)" />
             <line x1="${chartWidth - padding.right}" x2="${chartWidth - padding.right}" y1="${padding.top}" y2="${padding.top + innerHeight}" stroke="rgba(148, 163, 184, 0.35)" />
+
 <text
     x="${padding.left + innerWidth / 2}"
     y="${padding.top + innerHeight + 80}"
@@ -481,48 +506,54 @@ ${buildPieSvg(
       if (!chart) {
         return;
       }
-      const hasFailures = Object.values(counts).some((value) => value > 0);
+
+      const hasFailures =
+        Object.values(counts).some(value => value > 0);
 
       if (!hasFailures) {
         chart.innerHTML =
-          '<p class="empty-note">No pad failures found for the current selection.</p>';
-
+          '<div class="pareto-empty"><p class="empty-note">No pad failures found for the current selection.</p></div>';
         return;
       }
 
-      chart.innerHTML = this.renderParetoChart(counts);
+      chart.innerHTML =
+        this.renderParetoChart(counts);
 
-      chart
-        .querySelectorAll(".pareto-bar")
-        .forEach(bar => {
+      if (D.config.schemaId !== "magicray") {
+        chart
+          .querySelectorAll(".pareto-bar")
+          .forEach(bar => {
 
-          bar.addEventListener("click", () => {
+            bar.addEventListener("click", () => {
 
-            const failure =
-              bar.dataset.failure;
+              const failure =
+                bar.dataset.failure;
 
-            console.log(
-              "Pareto Click:",
-              failure
-            );
-
-            const query =
-              new URLSearchParams({
-                time: D.state.time,
-                line: D.state.line,
-                model: D.state.model,
+              console.log(
+                "Pareto Click:",
                 failure
-              });
+              );
 
-            window.location.href =
-              `pad-analysis.html?${query.toString()}`;
+              const query =
+                new URLSearchParams({
+                  time: D.state.time,
+                  line: D.state.line,
+                  model: D.state.model,
+                  failure
+                });
+
+              window.location.href =
+                `pad-analysis.html?${query.toString()}`;
+
+            });
 
           });
+      }
 
-        });
     },
 
     applyKpis(aggRes, padFailureCounts = {}) {
+      const isMagicRay = D.config.schemaId === "magicray";
 
       const aggs = aggRes.aggregations ?? {};
 
@@ -557,26 +588,31 @@ ${buildPieSvg(
         const count =
           bucket.inspections?.value ?? 0;
 
-        if (result === "GOOD") {
+        const normalized = D.normalizeResult(result);
+
+        if (normalized === "GOOD") {
 
           boardGood += count;
 
         } else if (
-          result === "WARNING" ||
-          result === "PASS"
+          normalized === "WARNING" ||
+          normalized === "PASS"
         ) {
 
           boardPass += count;
 
-        } else if (result === "NG") {
+        } else if (normalized === "FAIL") {
 
           boardFail += count;
         }
       }
 
+      // Display only good and fail on the board overview card.
+      boardGood += boardPass;
+      boardPass = 0;
+
       const boardCount =
         boardGood +
-        boardPass +
         boardFail;
 
       const boardYield =
@@ -600,14 +636,15 @@ ${buildPieSvg(
           ? "#22c55e"
           : "#ef4444";
 
-      boardCard.innerHTML =
-        buildOverviewCard({
-          title: "Board Overview",
-          yieldValue: boardYield,
-          yieldColor: boardYieldColor,
+      if (boardCard) {
+        boardCard.innerHTML =
+          buildOverviewCard({
+            title: "Board Overview",
+            yieldValue: boardYield,
+            yieldColor: boardYieldColor,
 
           goodCount: boardGood,
-          passCount: boardPass,
+          passCount: 0,
           failCount: boardFail,
 
           stats: [
@@ -620,10 +657,6 @@ ${buildPieSvg(
               value: boardGood
             },
             {
-              label: "Pass",
-              value: boardPass
-            },
-            {
               label: "Fail",
               value: boardFail
             },
@@ -633,72 +666,68 @@ ${buildPieSvg(
             }
           ]
         });
-
-      padCard.innerHTML =
-        buildOverviewCard({
-          title: "Pad Overview",
-          yieldValue: padYield,
-          yieldColor: padYieldColor,
-          goodCount: good,
-          passCount: 0,
-          failCount: fail,
-          stats: [
-            {
-              label: "Total",
-              value: total
-            },
-            {
-              label: "Good",
-              value: good
-            },
-            {
-              label: "Fail",
-              value: fail
-            },
-            {
-              label: "Yield",
-              value: `${padYield.toFixed(2)}%`
-            }
-          ]
-        });
-      this.updateParetoChart(padFailureCounts);
-
-      const boardOverview =
-        $("board-overview-card");
-
-      if (boardOverview) {
-
-        boardOverview.onclick = () => {
-
-          const query =
-            new URLSearchParams({
-              time: D.state.time,
-              line: D.state.line,
-              model: D.state.model
-            });
-
-          window.location.href =
-            `analysis.html?${query.toString()}`;
-        };
       }
+
+      const padTotalLabel =
+        D.config.schemaId === "magicray"
+          ? "Total Report Fail"
+          : "Total";
+
+      if (padCard) {
+        padCard.innerHTML =
+          buildOverviewCard({
+            title: "Pad Overview",
+            yieldValue: padYield,
+            yieldColor: padYieldColor,
+            goodCount: good,
+            passCount: 0,
+            failCount: fail,
+            stats: [
+              {
+                label: padTotalLabel,
+                value: total
+              },
+              {
+                label: "Good",
+                value: good
+              },
+              {
+                label: "Fail",
+                value: fail
+              },
+              {
+                label: "Yield",
+                value: `${padYield.toFixed(2)}%`
+              }
+            ]
+          });
+      }
+
 
       const padOverview =
         $("pad-overview-card");
 
       if (padOverview) {
+        padOverview.classList.toggle(
+          "overview-card-clickable",
+          !isMagicRay
+        );
 
-        padOverview.onclick = () => {
+        if (!isMagicRay) {
+          padOverview.onclick = () => {
+            const query =
+              new URLSearchParams({
+                time: D.state.time,
+                line: D.state.line,
+                model: D.state.model
+              });
 
-          const query =
-            new URLSearchParams({
-              time: D.state.time,
-              line: D.state.line,
-              model: D.state.model
-            });
-
-          window.location.href =
-            `pad-analysis.html?${query.toString()}`;
-        };
+            window.location.href =
+              `pad-analysis.html?${query.toString()}`;
+          };
+        } else {
+          padOverview.onclick = null;
+        }
       }
 
       // =========================
@@ -714,8 +743,10 @@ ${buildPieSvg(
         "updated",
         `Updated ${formatTime(new Date())}`
       );
+      this.updateParetoChart(padFailureCounts);
     },
-  }
+  };
+
   D.transform = {
     barcodeFromPath(path) {
       if (!path) return null;
@@ -728,15 +759,20 @@ ${buildPieSvg(
     },
 
     resolveBoardSerial(bucket) {
+      const topHit =
+        bucket.latest_doc?.hits?.hits?.[0]?._source || {};
 
-      const barcode =
-        bucket.top_barcode?.buckets?.[0]?.key;
+      const serialFields =
+        D.getKpi().serialSourceFields || [];
 
-      if (
-        barcode != null &&
-        String(barcode).trim()
-      ) {
-        return formatSerial(barcode);
+      for (const field of serialFields) {
+        if (topHit[field] != null && String(topHit[field]).trim()) {
+          return formatSerial(topHit[field]);
+        }
+      }
+
+      if (bucket.key != null) {
+        return formatSerial(bucket.key);
       }
 
       return "—";
@@ -744,39 +780,40 @@ ${buildPieSvg(
 
     boardBucketToRow(bucket) {
 
+      const topHit =
+        bucket.latest_doc?.hits?.hits?.[0]?._source || {};
+
+      const boardResultSource =
+        D.getKpi().boardResultField?.replace(/\.keyword$/, "") ||
+        "pcb_result";
+
       const latest =
-        bucket.latest?.value;
+        topHit[D.getFields().time] ??
+        topHit.timestamp;
 
       const topResult =
-        bucket.top_result?.buckets?.[0]?.key;
+        topHit[boardResultSource] ??
+        topHit.pcb_result;
 
       const machine =
-        bucket.top_machine?.buckets?.[0]?.key ??
+        topHit[D.getFields().machine] ??
+        topHit.machine ??
         null;
 
       let result;
 
-      if (
-        topResult === "GOOD" ||
-        topResult === "PASS"
-      ) {
+      const normalized = D.normalizeResult(topResult);
 
+      if (normalized === "GOOD") {
         result = "GOOD";
-
       } else if (
-        topResult === "WARNING"
+        normalized === "PASS" ||
+        normalized === "WARNING"
       ) {
-
         result = "PASS";
-
-      } else if (
-        topResult === "NG"
-      ) {
-
+      } else if (normalized === "FAIL") {
         result = "FAIL";
-
       } else {
-
         result = "PASS";
       }
 
@@ -785,11 +822,11 @@ ${buildPieSvg(
           D.transform.resolveBoardSerial(bucket),
 
         model:
-          bucket.top_model?.buckets?.[0]?.key ??
+          topHit[D.getFields().model] ??
           null,
 
         line:
-          bucket.top_line?.buckets?.[0]?.key ??
+          topHit[D.getFields().line] ??
           null,
 
         machine,

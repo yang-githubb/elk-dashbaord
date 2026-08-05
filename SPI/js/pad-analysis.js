@@ -59,8 +59,9 @@ function updateTitle() {
     }
 
     title.textContent =
-        `Failure Analysis - ${filterState.failure}`;
-
+        filterState.failure
+            ? `Failure Analysis - ${filterState.failure}`
+            : "Pad Failure Analysis";
 }
 
 /* ==========================================
@@ -98,7 +99,6 @@ function buildQuery() {
 /* ==========================================
  * Aggregations
  * ========================================== */
-
 function buildAggregations() {
 
     return {
@@ -106,10 +106,7 @@ function buildAggregations() {
         lines: {
             terms: {
                 field: "line.keyword",
-                size: 100,
-                order: {
-                    _count: "desc"
-                }
+                size: 100
             }
         },
 
@@ -130,21 +127,6 @@ function buildAggregations() {
                 }
             }
         },
-
-        pads: {
-            multi_terms: {
-                terms: [
-                    {
-                        field: "array_barcode.keyword"
-                    },
-                    {
-                        field: "pad_no"
-                    }
-                ],
-                size: 100
-            }
-        }
-
     };
 
 }
@@ -280,7 +262,17 @@ async function loadAnalysis() {
             "Loading Failure Analysis:",
             filterState.failure
         );
-
+        console.log(
+            JSON.stringify(
+                {
+                    size: 0,
+                    query: buildQuery(),
+                    aggs: buildAggregations()
+                },
+                null,
+                2
+            )
+        );
         const response =
             await esClient.search({
                 size: 0,
@@ -304,25 +296,6 @@ async function loadAnalysis() {
         renderModelLineMatrix(
             response.aggregations?.models?.buckets || []
         );
-
-        renderTable(
-            "pad-failure-thead",
-            "pad-failure-tbody",
-            "Array Barcode | Pad No",
-            response.aggregations?.pads?.buckets || [],
-            bucket => {
-
-                const barcode =
-                    bucket.key?.[0] ?? "";
-
-                const padNo =
-                    bucket.key?.[1] ?? "";
-
-                return `${barcode} | ${padNo}`;
-
-            }
-        );
-
     }
     catch (error) {
 
