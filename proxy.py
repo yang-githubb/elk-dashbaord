@@ -32,14 +32,19 @@ if getattr(sys, "frozen", False):
 else:
     ROOT = Path(__file__).resolve().parent / "SPI"
 
-ES_URL = os.environ.get("ES_URL", "https://elastic-sac-test.elkaas.flex.com").rstrip(
-    "/"
+ES_URL = os.environ.get(
+    "ES_URL", "https://elastic-sac-platinum.elkaas.flex.com"
+).rstrip("/")
+
+ES_INDEX = os.environ.get(
+    "ES_INDEX", "flexh1smtmachinesdata00589-jax_process_optimizations*"
 )
-ES_INDEX = os.environ.get("ES_INDEX", "flexh1smtmachinesdata-tan_meng_kiang-*")
+
 ES_USERNAME = os.environ.get(
-    "ES_USERNAME", "flexh1smtmachinesdata-sac-tst-00589-service-user"
+    "ES_USERNAME", "flexh1smtmachinesdata00589-sac-pl-00601-service-user"
 )
-ES_PASSWORD = os.environ.get("ES_PASSWORD", "f*oA-4cj")
+
+ES_PASSWORD = os.environ.get("ES_PASSWORD", "7Efuei>L")
 ES_TIMEOUT_SEC = int(os.environ.get("ES_TIMEOUT_SEC", "300"))
 SEARCH_URL = f"{ES_URL}/{ES_INDEX}/_search"
 

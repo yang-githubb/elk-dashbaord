@@ -15,7 +15,7 @@ window.DASHBOARD_SCHEMAS.SPI = {
 
   // ================= FIELD MAPPING =================
   fields: {
-    time: "timestamp",
+    time: "inspection_date",
     line: "line",
     model: "pcb_name",
     serial: "array_barcode", // ✅ SPI board identity
@@ -77,7 +77,7 @@ window.DASHBOARD_SCHEMAS.SPI = {
     // BOARD LEVEL
     // =====================================================
 
-    boardResultField: "pcb_result.keyword",
+    boardResultField: "pcb_result",
 
     boardGood: [
       "GOOD"
@@ -92,13 +92,13 @@ window.DASHBOARD_SCHEMAS.SPI = {
       "NG"
     ],
 
-    boardFailField: "pcb_result.keyword",
+    boardFailField: "pcb_result",
 
     // =====================================================
     // BOARD IDENTITY
     // =====================================================
 
-    serialField: "array_barcode.keyword",
+    serialField: "array_barcode",
 
     serialSourceFields: [
       "array_barcode"
@@ -121,7 +121,7 @@ window.DASHBOARD_SCHEMAS.SPI = {
 
   // ================= SORT =================
   detailSort: [
-    { timestamp: { order: "desc" } },
+    { inspection_date: { order: "desc" } },
     { pad_no: { order: "asc" } },
     { "component_id.keyword": { order: "asc" } },
   ],
@@ -131,14 +131,14 @@ window.DASHBOARD_SCHEMAS.SPI = {
     { key: "serial", label: "Serial", type: "serial" },
     { key: "model", label: "PCB Name" },
     { key: "line", label: "Line" },
-    { key: "timestamp", label: "Last Inspection", type: "time" },
+    { key: "inspection_date", label: "Last Inspection", type: "time" },
     { key: "pad_count", label: "Pads", type: "number" },
     { key: "result", label: "Result", type: "result" },
   ],
 
   // ================= TABLE: PAD =================
   padColumns: [
-    { key: "timestamp", label: "Timestamp", type: "time" },
+    { key: "inspection_date", label: "inspection_date", type: "time" },
     { key: "model", label: "PCB Name", source: "pcb_name" },
     { key: "line", label: "Line" },
     { key: "station", label: "Station" },
@@ -157,7 +157,7 @@ window.DASHBOARD_SCHEMAS.SPI = {
 
   // ================= SOURCE FIELDS =================
   padSourceFields: [
-    "timestamp",
+    "inspection_date",
     "pcb_name",
     "line",
     "station",
