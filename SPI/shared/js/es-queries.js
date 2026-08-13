@@ -203,9 +203,6 @@
       const resultField = this.padResultField();
       const kpi = D.getKpi();
       const breakdown = {
-        boards: {
-          cardinality: { field: "spi_array_barcode.keyword" },
-        },
         count_good: {
           filter: this.buildTermsFilter(resultField, kpi.good || ["GOOD"]),
         },
