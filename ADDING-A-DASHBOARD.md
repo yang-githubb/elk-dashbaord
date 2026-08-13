@@ -2,11 +2,11 @@
 
 Full architecture, SPI indices, and KPI rules: [README.md](README.md).
 
-Each data source gets its own folder under `dashboards/<id>/`. Do not copy SPI query code into the new folder unless that source really uses the same indices.
+Each data source gets its own folder under `web/dashboards/<id>/`. Do not copy SPI query code into the new folder unless that source really uses the same indices.
 
 ## 1. Register the dashboard
 
-Add an entry to `shared/js/registry.js`:
+Add an entry to `web/shared/js/registry.js`:
 
 ```javascript
 {
@@ -22,8 +22,8 @@ Add an entry to `shared/js/registry.js`:
 ## 2. Create the folder
 
 ```
-dashboards/aoi/
-  index.html      ← copy from dashboards/spi/index.html and trim features
+web/dashboards/aoi/
+  index.html      ← copy from web/dashboards/spi/index.html and trim features
   schema.js       ← field maps, KPI rules, features, labels, pages
   js/             ← optional page-specific scripts (analysis, export, …)
   analysis.html   ← optional sub-pages
@@ -60,25 +60,28 @@ Load scripts in this order (paths relative to the dashboard folder):
 
 | Path | Role |
 |------|------|
-| `shared/js/app.js` | Main dashboard logic |
-| `shared/js/es-queries.js` | Query builders |
-| `shared/js/es-client.js` | `/search` and `/search-board` client |
-| `shared/js/ui.js` | KPI cards, tables, charts |
-| `shared/config/bootstrap.js` | Merges env + schema into `Dashboard.config` |
+| `web/shared/js/app.js` | Main dashboard logic |
+| `web/shared/js/es-queries.js` | Query builders |
+| `web/shared/js/es-client.js` | `/search` and `/search-board` client |
+| `web/shared/js/ui.js` | KPI cards, tables, charts |
+| `web/shared/config/bootstrap.js` | Merges env + schema into `Dashboard.config` |
 
 ## Project layout
 
 ```
-index.html                   ← hub (lists all dashboards)
-shared/
-  styles.css
-  config/
-  js/
-dashboards/
-  spi/
-  magicray/
-  aoi/                       ← your new dashboard
-proxy.py                     ← serves the repo root
+README.md
+proxy.py
+start.bat
+web/
+  index.html                 ← hub
+  shared/
+    styles.css
+    config/
+    js/
+  dashboards/
+    spi/
+    magicray/
+    aoi/                     ← your new dashboard
 ```
 
-After adding a folder, no proxy changes are needed — anything under `dashboards/` is served automatically.
+After adding a folder, no proxy changes are needed — anything under `web/dashboards/` is served automatically.

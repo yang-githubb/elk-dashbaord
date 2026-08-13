@@ -2,7 +2,7 @@
 
 Factory dashboards for **SPI** solder-paste inspection and **MagicRay** FQI autotest. Data comes from Elasticsearch. The UI is plain HTML, CSS, and JavaScript — no build step, no npm.
 
-The repo root is the web root. `proxy.py` serves HTML/JS/CSS from this folder and forwards search requests to Elasticsearch so the browser never talks to the cluster directly.
+The browser app lives in `web/`. `proxy.py` serves that folder as `/` and forwards search requests to Elasticsearch so the browser never talks to the cluster directly.
 
 ---
 
@@ -58,42 +58,41 @@ Old bookmarks still work via small redirect files:
 
 ```
 elk-dashboard/
-  proxy.py                         Static server + ES proxy (the only backend)
-  start.bat                        Starts proxy.py and opens the hub
   README.md                        This file
   ADDING-A-DASHBOARD.md            Checklist for a new data source
-  index.html                       Hub — pick SPI or MagicRay
-  analysis.html / pad-analysis.html / magicray.html
-                                   Redirects for old bookmarks
-  shared/                          Code used by every dashboard
-    styles.css
-    config/
-      environments.js              Cluster URL + proxy path
-      user.js                      Which environment to use
-      settings.js                  Time ranges, page size, timeouts
-      bootstrap.js                 Merges the above into Dashboard.config
-    js/
-      registry.js                  Hub cards + top-nav entries
-      shell.js                     Top navigation
-      config-access.js             Helpers to read schema/config
-      es-queries.js                Elasticsearch query / aggregation builders
-      es-client.js                 POST /search and POST /search-board
-      ui.js                        KPI cards, tables, Pareto chart
-      app.js                       Dashboard controller (load, filter, export)
-  dashboards/
-    spi/                           SPI solder-paste inspection
-      index.html
-      schema.js                    SPI field map + KPI rules
-      analysis.html
-      pad-analysis.html
-      js/analysis.js
-      js/pad-analysis.js
-    magicray/                      MagicRay FQI autotest
-      index.html
-      schema.js                    Assumed field map (not confirmed from mapping)
+  proxy.py                         Static server + ES proxy
+  start.bat                        Starts proxy.py and opens the hub
+  web/                             Everything the browser is served
+    index.html                     Hub — pick SPI or MagicRay
+    shared/                        Code used by every dashboard
+      styles.css
+      config/
+        environments.js            Cluster URL + proxy path
+        user.js                    Which environment to use
+        settings.js                Time ranges, page size, timeouts
+        bootstrap.js               Merges the above into Dashboard.config
+      js/
+        registry.js                Hub cards + top-nav entries
+        shell.js                   Top navigation
+        config-access.js           Helpers to read schema/config
+        es-queries.js              Elasticsearch query / aggregation builders
+        es-client.js               POST /search and POST /search-board
+        ui.js                      KPI cards, tables, Pareto chart
+        app.js                     Dashboard controller (load, filter, export)
+    dashboards/
+      spi/                         SPI solder-paste inspection
+        index.html
+        schema.js                  SPI field map + KPI rules
+        analysis.html
+        pad-analysis.html
+        js/analysis.js
+        js/pad-analysis.js
+      magicray/                    MagicRay FQI autotest
+        index.html
+        schema.js                  Assumed field map (not confirmed from mapping)
 ```
 
-`proxy.py` serves the repo root. A request for `/dashboards/spi/index.html` is the file `dashboards/spi/index.html`.
+`proxy.py` serves `web/` as `/`. A request for `/dashboards/spi/index.html` is the file `web/dashboards/spi/index.html`. Short aliases (`/spi`, `/magicray`, `/analysis.html`) are 302-redirects in `proxy.py`, not extra HTML files.
 
 ---
 
@@ -128,7 +127,7 @@ A board can be `pcb_result: PASS` while some pads are `spi_pad_result: EXCESSIVE
 - **spi-board** fields used here are **native keyword**. Query them as `line`, `pcb_name`, `array_barcode`. Do **not** append `.keyword`.
 - **jax** text fields need `.keyword` for exact terms aggregations: `spi_pad_result.keyword`, `spi_array_barcode.keyword`, `spi_pcb_name.keyword`, `line.keyword`.
 
-`dashboards/spi/schema.js` encodes that. Shared helpers:
+`web/dashboards/spi/schema.js` encodes that. Shared helpers:
 
 - `D.esBoardField("line")` → `line`
 - `D.esField("line")` → `line.keyword`
@@ -137,7 +136,7 @@ A board can be `pcb_result: PASS` while some pads are `spi_pad_result: EXCESSIVE
 
 ## SPI pages, in detail
 
-### 1. Dashboard (`dashboards/spi/index.html`)
+### 1. Dashboard (`web/dashboards/spi/index.html`)
 
 Filters: time range, line, model. Default time range is **All time** (`settings.js` → `defaultTimeRange: "all"`). All time sends **no date filter**, so Elasticsearch scans the whole index.
 
@@ -258,7 +257,7 @@ That is two child buckets per model, not twelve.
 
 | Method | Path | What it does |
 |--------|------|----------------|
-| GET | `/` and any `.html` / `.js` / `.css` under the repo root | Static files |
+| GET | `/` and any `.html` / `.js` / `.css` under `web/` | Static files |
 | POST | `/search` | Forwards the JSON body to the **jax** index `_search` |
 | POST | `/search-board` | Forwards the JSON body to the **spi-board** index `_search` |
 | OPTIONS | `/search` | CORS / health probe |
@@ -280,7 +279,7 @@ The browser never sends Elasticsearch credentials. `es-client.js` posts to `/sea
 
 ## Configuration files
 
-Startup order on an SPI page (see `dashboards/spi/index.html`):
+Startup order on an SPI page (see `web/dashboards/spi/index.html`):
 
 1. `environments.js` — cluster
 2. `user.js` — which environment
@@ -292,11 +291,11 @@ Startup order on an SPI page (see `dashboards/spi/index.html`):
 
 | File | Purpose |
 |------|---------|
-| `shared/config/user.js` | `environment: "factory-sac"`. Optional `overrides.defaultTimeRange` / `pageSize`. |
-| `shared/config/environments.js` | `node`, `proxyUrl`. Keep `node` in sync with `ES_URL` in `proxy.py`. |
-| `shared/config/settings.js` | `defaultTimeRange`, `timeLabels`, `pageSize` (25), `refreshMs` (120s), `fetchTimeoutMs` (`0` = no abort). |
-| `dashboards/spi/schema.js` | SPI field names, good/fail values, column lists, `indexMode: "dual"`. |
-| `dashboards/magicray/schema.js` | MagicRay field names, `indexMode: "single"`. Mapping was never confirmed from a real index dump. |
+| `web/shared/config/user.js` | `environment: "factory-sac"`. Optional `overrides.defaultTimeRange` / `pageSize`. |
+| `web/shared/config/environments.js` | `node`, `proxyUrl`. Keep `node` in sync with `ES_URL` in `proxy.py`. |
+| `web/shared/config/settings.js` | `defaultTimeRange`, `timeLabels`, `pageSize` (25), `refreshMs` (120s), `fetchTimeoutMs` (`0` = no abort). |
+| `web/dashboards/spi/schema.js` | SPI field names, good/fail values, column lists, `indexMode: "dual"`. |
+| `web/dashboards/magicray/schema.js` | MagicRay field names, `indexMode: "single"`. Mapping was never confirmed from a real index dump. |
 | `proxy.py` | Port, ES URL, both index names, credentials, timeout. |
 
 To default the time dropdown back to 14 days, set `defaultTimeRange: "14d"` in `settings.js` (or `user.js` overrides). `"all"` must stay in `timeOrder` to keep the All time option.
@@ -331,13 +330,13 @@ Short checklist: [ADDING-A-DASHBOARD.md](ADDING-A-DASHBOARD.md).
 
 Idea: one folder per data source, shared core stays generic.
 
-1. Add `dashboards/<id>/index.html` and `schema.js`.
-2. Register the card in `shared/js/registry.js` (`path` must be `/dashboards/<id>/index.html`).
+1. Add `web/dashboards/<id>/index.html` and `schema.js`.
+2. Register the card in `web/shared/js/registry.js` (`path` must be `/dashboards/<id>/index.html`).
 3. Set `indexMode` to `"dual"` if you have a header index plus a detail index, or `"single"` if one index holds everything.
 4. Map `fields` / `boardFields` and `kpi.good` / `kpi.fail` from a real Elasticsearch mapping, not from names that “look right”.
 5. If you need a second index, add another POST route in `proxy.py` (the way `/search-board` was added for SPI).
 
-No proxy change is required for new **static** files under `dashboards/`.
+No proxy change is required for new **static** files under `web/dashboards/`.
 
 ---
 
@@ -355,7 +354,7 @@ No proxy change is required for new **static** files under `dashboards/`.
 | Symptom | Likely cause | What to do |
 |---------|--------------|------------|
 | Page looks like the old version | Old `proxy.py` still running | Kill it, start again, `Ctrl+F5` |
-| `404` on `/dashboards/spi/index.html` | Proxy started from the wrong folder, or old proxy | Run `python proxy.py` from the repo root |
+| `404` on `/dashboards/spi/index.html` | Old proxy still serving `SPI/` or the repo root | Kill it, run `python proxy.py` from the repo root (it must print `web` as the static root) |
 | Browser **downloads** a file named `spi` | Hit `/spi` without redirect / MIME | Use `/dashboards/spi/index.html` or pull a version that 302s `/spi` |
 | `HTTP 400` | Invalid search body (for example `request_cache` inside JSON) | Check the error text on the red banner; that key must not be in the body |
 | `502` / cannot reach Elasticsearch | No VPN, or `ES_URL` wrong | Connect VPN; check `proxy.py` |
