@@ -127,7 +127,7 @@
           ? { terms: { field: lineField, size: 200, order: { _key: "asc" } } }
           : { terms: { field: "_id", size: 0 } },
         models: modelField
-          ? { terms: { field: modelField, size: 200, order: { _key: "asc" } } }
+          ? { terms: { field: modelField, size: 10000, order: { _key: "asc" } } }
           : { terms: { field: "_id", size: 0 } },
       },
     });
@@ -167,7 +167,7 @@
   async function loadPadKpis(signal) {
     return esClient.search(
       kpiSearchBody(
-        esQueries.buildEsQuery(esQueries.buildEsFilters({ skipSerialSearch: true })),
+        esQueries.buildEsQuery(esQueries.buildEsFilters({ skipSerialSearch: true, lite: true })),
         esQueries.buildPadDashboardAggs()
       ),
       signal
@@ -289,7 +289,7 @@
       } else {
         const res = await esClient.search(
           kpiSearchBody(
-            esQueries.buildEsQuery(esQueries.buildEsFilters({ skipSerialSearch: true })),
+            esQueries.buildEsQuery(esQueries.buildEsFilters({ skipSerialSearch: true, lite: true })),
             {
               ...esQueries.buildBoardDashboardAggs(),
               ...esQueries.buildPadDashboardAggs(),

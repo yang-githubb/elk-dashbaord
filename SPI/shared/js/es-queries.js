@@ -9,6 +9,9 @@
     return { terms: { field: "_id", size: 0 } };
   }
 
+  const LINE_TERMS_SIZE = 200;
+  const MODEL_TERMS_SIZE = 10000;
+
   D.esQueries = {
     isAllTime() {
       return D.state.time === "all";
@@ -101,18 +104,20 @@
         });
       }
 
-      if (kpi.requireSerialField) {
-        filters.push({ exists: { field: kpi.requireSerialField } });
-      }
-      if (kpi.excludeEmptySerial !== false && kpi.serialField) {
-        filters.push({
-          bool: { must_not: [{ term: { [kpi.serialField]: "" } }] },
-        });
-      }
-      if (kpi.excludeLeadingUnderscoreSource) {
-        filters.push({
-          bool: { must_not: [{ prefix: { "source_file.keyword": "_" } }] },
-        });
+      if (!options.lite) {
+        if (kpi.requireSerialField) {
+          filters.push({ exists: { field: kpi.requireSerialField } });
+        }
+        if (kpi.excludeEmptySerial !== false && kpi.serialField) {
+          filters.push({
+            bool: { must_not: [{ term: { [kpi.serialField]: "" } }] },
+          });
+        }
+        if (kpi.excludeLeadingUnderscoreSource) {
+          filters.push({
+            bool: { must_not: [{ prefix: { "source_file.keyword": "_" } }] },
+          });
+        }
       }
 
       return filters;
@@ -150,40 +155,38 @@
     buildBoardDashboardAggs() {
       return {
         board_results: {
-          terms: { field: this.boardResultField(), size: 10 },
-          aggs: {
-            inspections: {
-              cardinality: { field: this.boardSourceFileField() },
-            },
-          },
-        },
-      };
-    },
-
-    buildPadDashboardAggs() {
-      return {
-        pad_results: {
           terms: {
-            field: this.padResultField(),
-            size: 40,
-            // Few pad-result values; map avoids building global ordinals.
+            field: this.boardResultField(),
+            size: 10,
             execution_hint: "map",
           },
         },
       };
     },
 
+    padResultTermsAgg() {
+      return {
+        pad_results: {
+          terms: {
+            field: this.padResultField(),
+            size: 40,
+            execution_hint: "map",
+          },
+        },
+      };
+    },
+
+    buildPadDashboardAggs() {
+      return this.padResultTermsAgg();
+    },
+
     boardBreakdownAgg() {
       return {
-        boards: {
-          cardinality: { field: "array_barcode" },
-        },
         board_results: {
-          terms: { field: this.boardResultField(), size: 10 },
-          aggs: {
-            inspections: {
-              value_count: { field: this.boardSourceFileField() },
-            },
+          terms: {
+            field: this.boardResultField(),
+            size: 10,
+            execution_hint: "map",
           },
         },
       };
@@ -199,9 +202,6 @@
         count_good: {
           filter: this.buildTermsFilter(resultField, kpi.good || ["GOOD"]),
         },
-        count_pass: {
-          filter: this.buildTermsFilter(resultField, kpi.pass || []),
-        },
         count_fail: {
           filter: this.buildTermsFilter(resultField, this.padFailValues()),
         },
@@ -209,10 +209,24 @@
 
       return {
         lines: lineField
-          ? { terms: { field: lineField, size: 100 }, aggs: breakdown }
+          ? {
+              terms: {
+                field: lineField,
+                size: LINE_TERMS_SIZE,
+                execution_hint: "map",
+              },
+              aggs: breakdown,
+            }
           : emptyTermsAgg(),
         models: modelField
-          ? { terms: { field: modelField, size: 200 }, aggs: breakdown }
+          ? {
+              terms: {
+                field: modelField,
+                size: MODEL_TERMS_SIZE,
+                order: { _count: "desc" },
+              },
+              aggs: breakdown,
+            }
           : emptyTermsAgg(),
       };
     },
@@ -225,10 +239,24 @@
 
       return {
         lines: lineField
-          ? { terms: { field: lineField, size: 100 }, aggs: breakdown }
+          ? {
+              terms: {
+                field: lineField,
+                size: LINE_TERMS_SIZE,
+                execution_hint: "map",
+              },
+              aggs: breakdown,
+            }
           : emptyTermsAgg(),
         models: modelField
-          ? { terms: { field: modelField, size: 200 }, aggs: breakdown }
+          ? {
+              terms: {
+                field: modelField,
+                size: MODEL_TERMS_SIZE,
+                order: { _count: "desc" },
+              },
+              aggs: breakdown,
+            }
           : emptyTermsAgg(),
       };
     },

@@ -12,7 +12,7 @@
 
   function formatCount(value) {
     const n = Number(value);
-    return Number.isNaN(n) ? cellValue(value) : n.toLocaleString();
+    return Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
   }
 
   function formatSerial(value) {
@@ -22,7 +22,7 @@
   function formatNumber(value) {
     const n = Number(value);
     if (Number.isNaN(n)) return cellValue(value);
-    return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+    return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
   }
 
   function formatTime(value) {

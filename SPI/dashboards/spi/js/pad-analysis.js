@@ -21,7 +21,9 @@
   };
 
   function buildQuery() {
-    const filters = [...esQueries.buildEsFilters()];
+    const filters = [
+      ...esQueries.buildEsFilters({ skipSerialSearch: true, lite: true }),
+    ];
     if (filterState.failure) {
       filters.push({
         term: { [esQueries.padResultField()]: filterState.failure },
@@ -36,11 +38,15 @@
     const modelField = Dashboard.esField(fields.model);
 
     return {
-      lines: { terms: { field: lineField, size: 100 } },
+      lines: {
+        terms: { field: lineField, size: 200, execution_hint: "map" },
+      },
       models: {
-        terms: { field: modelField, size: 100, order: { _count: "desc" } },
+        terms: { field: modelField, size: 10000, order: { _count: "desc" } },
         aggs: {
-          lines: { terms: { field: lineField, size: 20 } },
+          lines: {
+            terms: { field: lineField, size: 20, execution_hint: "map" },
+          },
         },
       },
     };
@@ -62,7 +68,7 @@
         (bucket) => `
           <tr>
             <td>${bucket.key}</td>
-            <td>${bucket.doc_count.toLocaleString()}</td>
+            <td>${bucket.doc_count.toLocaleString("en-US")}</td>
           </tr>`
       )
       .join("");
@@ -97,7 +103,7 @@
         const cells = allLines
           .map(
             (line) =>
-              `<td>${(lineMap[line] || 0).toLocaleString()}</td>`
+              `<td>${(lineMap[line] || 0).toLocaleString("en-US")}</td>`
           )
           .join("");
 
@@ -105,7 +111,7 @@
           <tr>
             <td>${model.key}</td>
             ${cells}
-            <td>${model.doc_count.toLocaleString()}</td>
+            <td>${model.doc_count.toLocaleString("en-US")}</td>
           </tr>`;
       })
       .join("");
@@ -114,6 +120,7 @@
   async function loadAnalysis() {
     const response = await esClient.search({
       size: 0,
+      track_total_hits: false,
       query: buildQuery(),
       aggs: buildAggregations(),
     });

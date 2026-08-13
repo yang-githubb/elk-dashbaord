@@ -22,6 +22,11 @@
     model: filterState.model,
   };
 
+  function formatCount(value) {
+    const n = Number(value);
+    return Number.isNaN(n) ? "—" : n.toLocaleString("en-US");
+  }
+
   function yieldPct(good, total) {
     return total > 0 ? ((good / total) * 100).toFixed(2) : "0.00";
   }
@@ -29,7 +34,7 @@
   function buildPadRow(bucket, keyName) {
     const good = bucket.count_good?.doc_count || 0;
     const fail = bucket.count_fail?.doc_count || 0;
-    const total = good + (bucket.count_pass?.doc_count || 0) + fail;
+    const total = bucket.doc_count || 0;
     return {
       [keyName]: bucket.key,
       good,
@@ -42,9 +47,9 @@
   function buildBoardRow(bucket, keyName) {
     const counts = Dashboard.countNormalizedResults(
       bucket.board_results?.buckets || [],
-      (result) => result.inspections?.value || 0
+      (result) => result.doc_count || 0
     );
-    const boards = Math.round(bucket.boards?.value ?? bucket.doc_count ?? 0);
+    const boards = bucket.doc_count || 0;
     const total = counts.good + counts.pass + counts.fail;
     return {
       [keyName]: bucket.key,
@@ -76,9 +81,9 @@
           (row) => `
             <tr>
               <td>${row[keyName]}</td>
-              <td>${row.good}</td>
-              <td>${row.fail}</td>
-              <td>${row.total}</td>
+              <td>${formatCount(row.good)}</td>
+              <td>${formatCount(row.fail)}</td>
+              <td>${formatCount(row.total)}</td>
               <td>${row.yield}</td>
             </tr>`
         )
@@ -100,10 +105,10 @@
         (row) => `
           <tr>
             <td>${row[keyName]}</td>
-            <td>${row.boards}</td>
-            <td>${row.good}</td>
-            <td>${row.pass}</td>
-            <td>${row.fail}</td>
+            <td>${formatCount(row.boards)}</td>
+            <td>${formatCount(row.good)}</td>
+            <td>${formatCount(row.pass)}</td>
+            <td>${formatCount(row.fail)}</td>
             <td>${row.yield}</td>
           </tr>`
       )
@@ -114,11 +119,15 @@
     const res = isPadView
       ? await esClient.search({
           size: 0,
-          query: esQueries.buildEsQuery(esQueries.buildEsFilters()),
+          track_total_hits: false,
+          query: esQueries.buildEsQuery(
+            esQueries.buildEsFilters({ skipSerialSearch: true, lite: true })
+          ),
           aggs: esQueries.buildPadAnalysisAggs(),
         })
       : await esClient.searchBoard({
           size: 0,
+          track_total_hits: false,
           query: esQueries.buildEsQuery(esQueries.buildBoardFilters()),
           aggs: esQueries.buildBoardAnalysisAggs(),
         });
@@ -129,8 +138,7 @@
       .sort((a, b) => (isPadView ? b.total - a.total : b.boards - a.boards));
     const modelRows = (res.aggregations?.models?.buckets || [])
       .map((bucket) => rowFn(bucket, "model"))
-      .sort((a, b) => (isPadView ? b.total - a.total : b.boards - a.boards))
-      .slice(0, 50);
+      .sort((a, b) => (isPadView ? b.total - a.total : b.boards - a.boards));
 
     renderKpiTable("line-kpi-thead", "line-kpi-tbody", "Line", lineRows, "line");
     renderKpiTable(
