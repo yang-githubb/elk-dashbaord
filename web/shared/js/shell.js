@@ -15,7 +15,7 @@
 
     const registry = window.DASHBOARD_REGISTRY || [];
     const links = [
-      `<a href="${rootHref("index.html")}" class="dashboard-tab${currentId ? "" : " dashboard-tab-active"}">Home</a>`,
+      `<a href="/" class="dashboard-tab${currentId ? "" : " dashboard-tab-active"}">Home</a>`,
       ...registry.map((entry) => {
         const active = entry.id === currentId ? " dashboard-tab-active" : "";
         return `<a href="${rootHref(entry.path)}" class="dashboard-tab${active}">${entry.label}</a>`;

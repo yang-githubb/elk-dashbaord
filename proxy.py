@@ -84,14 +84,24 @@ def _norm_path(path: Path) -> str:
     return text
 
 
-def _is_under_root(path: Path) -> bool:
-    root = _norm_path(ROOT)
+def _is_under_root(path: Path, root: Path) -> bool:
+    root_text = _norm_path(root)
     child = _norm_path(path)
-    return child == root or child.startswith(root + os.sep)
+    return child == root_text or child.startswith(root_text + os.sep)
+
+
+def static_roots() -> list[Path]:
+    """Prefer web/, then repo root / SPI/ so older checkouts still serve."""
+    roots: list[Path] = []
+    for candidate in (ROOT, REPO_ROOT / "web", REPO_ROOT, REPO_ROOT / "SPI"):
+        resolved = candidate.resolve()
+        if resolved.is_dir() and resolved not in roots:
+            roots.append(resolved)
+    return roots
 
 
 def resolve_static(name: str) -> Path | None:
-    """Return a file under ROOT, or None if missing / outside the tree."""
+    """Return a file under the static root, or None if missing / outside the tree."""
     name = PATH_ALIASES.get(name, name)
     name = normalize_name(name)
     if not name or name.endswith("/"):
@@ -100,17 +110,16 @@ def resolve_static(name: str) -> Path | None:
     if ".." in Path(name).parts:
         return None
 
-    candidate = (ROOT / name).resolve()
-    if not _is_under_root(candidate):
-        return None
-
-    if candidate.is_dir():
-        candidate = (candidate / "index.html").resolve()
-        if not _is_under_root(candidate):
-            return None
-
-    if candidate.is_file() and candidate.suffix.lower() in STATIC_SUFFIXES:
-        return candidate
+    for root in static_roots():
+        candidate = (root / name).resolve()
+        if not _is_under_root(candidate, root):
+            continue
+        if candidate.is_dir():
+            candidate = (candidate / "index.html").resolve()
+            if not _is_under_root(candidate, root):
+                continue
+        if candidate.is_file() and candidate.suffix.lower() in STATIC_SUFFIXES:
+            return candidate
     return None
 
 
@@ -166,7 +175,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         name = normalize_name(path)
-        if path in ("", "/"):
+        if path in ("", "/", "/index.html"):
             name = "index.html"
         elif name in PATH_ALIASES:
             target = "/" + PATH_ALIASES[name].lstrip("/")
