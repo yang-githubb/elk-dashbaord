@@ -42,6 +42,23 @@
     return "Basic " + btoa(`${username}:${password}`);
   }
 
+  function formatSearchError(status, statusText, text) {
+    try {
+      const payload = JSON.parse(text);
+      const reason =
+        payload.error?.root_cause?.[0]?.reason ||
+        payload.error?.reason ||
+        payload.error ||
+        payload.hint;
+      if (reason) {
+        return `HTTP ${status}: ${typeof reason === "string" ? reason : JSON.stringify(reason)}`;
+      }
+    } catch {
+      /* use status text */
+    }
+    return `HTTP ${status} ${statusText}`;
+  }
+
   async function postSearch(url, body, signal) {
     const controller = new AbortController();
     const timeoutMs = Number(cfg().fetchTimeoutMs) || 0;
@@ -67,7 +84,7 @@
 
       const text = await res.text();
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        throw new Error(formatSearchError(res.status, res.statusText, text));
       }
       return JSON.parse(text);
     } finally {

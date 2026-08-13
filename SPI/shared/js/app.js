@@ -149,7 +149,6 @@
     return {
       size: 0,
       track_total_hits: false,
-      request_cache: true,
       query,
       aggs,
     };
