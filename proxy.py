@@ -29,13 +29,10 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 PORT = int(os.environ.get("PORT", "8000"))
-if getattr(sys, "frozen", False):
-    if hasattr(sys, "_MEIPASS"):
-        ROOT = Path(sys._MEIPASS).resolve()
-    else:
-        ROOT = (Path(__file__).resolve().parent / "SPI").resolve()
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    ROOT = Path(sys._MEIPASS).resolve()
 else:
-    ROOT = (Path(__file__).resolve().parent / "SPI").resolve()
+    ROOT = Path(__file__).resolve().parent
 
 ES_URL = os.environ.get(
     "ES_URL", "https://elastic-sac-platinum.elkaas.flex.com"
@@ -62,7 +59,7 @@ ES_TIMEOUT_SEC = int(os.environ.get("ES_TIMEOUT_SEC", "0"))
 STATIC_SUFFIXES = frozenset({".html", ".js", ".css", ".ico", ".svg", ".png", ".map"})
 CHUNK_SIZE = 65536  # 64KB chunks for writing large responses
 
-# Short URLs → files under SPI/
+# Short URLs → files under the repo root
 PATH_ALIASES = {
     "spi": "dashboards/spi/index.html",
     "spi/": "dashboards/spi/index.html",

@@ -1,12 +1,12 @@
 # Adding a new dashboard
 
-Full architecture, SPI indices, and KPI rules: [README.md](../README.md).
+Full architecture, SPI indices, and KPI rules: [README.md](README.md).
 
-Each data source gets its own folder under `SPI/dashboards/<id>/`. Do not copy SPI query code into the new folder unless that source really uses the same indices.
+Each data source gets its own folder under `dashboards/<id>/`. Do not copy SPI query code into the new folder unless that source really uses the same indices.
 
 ## 1. Register the dashboard
 
-Add an entry to `SPI/shared/js/registry.js`:
+Add an entry to `shared/js/registry.js`:
 
 ```javascript
 {
@@ -22,7 +22,7 @@ Add an entry to `SPI/shared/js/registry.js`:
 ## 2. Create the folder
 
 ```
-SPI/dashboards/aoi/
+dashboards/aoi/
   index.html      ← copy from dashboards/spi/index.html and trim features
   schema.js       ← field maps, KPI rules, features, labels, pages
   js/             ← optional page-specific scripts (analysis, export, …)
@@ -69,17 +69,16 @@ Load scripts in this order (paths relative to the dashboard folder):
 ## Project layout
 
 ```
-SPI/
-  index.html                 ← hub (lists all dashboards)
-  shared/
-    styles.css
-    config/
-    js/
-  dashboards/
-    spi/
-    magicray/
-    aoi/                     ← your new dashboard
-proxy.py                     ← serves SPI/ as web root
+index.html                   ← hub (lists all dashboards)
+shared/
+  styles.css
+  config/
+  js/
+dashboards/
+  spi/
+  magicray/
+  aoi/                       ← your new dashboard
+proxy.py                     ← serves the repo root
 ```
 
 After adding a folder, no proxy changes are needed — anything under `dashboards/` is served automatically.
