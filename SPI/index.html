@@ -4,40 +4,44 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ELK Dashboards</title>
+  <title>SMT Dashboards</title>
   <link rel="stylesheet" href="shared/styles.css" />
 </head>
 
-<body>
-  <header class="header">
+<body class="hub-page">
+  <header class="header hub-header">
     <div class="header-title">
-      <h1>ELK Dashboards</h1>
+      <h1>SMT Dashboards</h1>
     </div>
-    <nav class="dashboard-tabs"></nav>
   </header>
 
   <main class="hub-main">
-    <p class="hub-intro">
-      Choose a data source. Each dashboard lives in its own folder under
-      <code>dashboards/</code> with a dedicated schema and pages.
-    </p>
+    <div class="hub-copy">
+      <h2>Choose a dashboard</h2>
+      <p>Open the inspection source you want to review.</p>
+    </div>
     <div id="hub-grid" class="hub-grid"></div>
   </main>
 
   <script src="shared/js/registry.js"></script>
-  <script src="shared/js/shell.js"></script>
   <script>
     (function () {
       const grid = document.getElementById("hub-grid");
       const registry = window.DASHBOARD_REGISTRY || [];
 
+      if (!registry.length) {
+        grid.innerHTML = '<p class="hub-intro">No dashboards are registered.</p>';
+        return;
+      }
+
       grid.innerHTML = registry
         .map(
           (entry) => `
-            <a class="hub-card" href="/${entry.path}">
+            <a class="hub-card" href="${entry.path}">
+              <span class="hub-card-station">${entry.station || entry.id}</span>
               <h2>${entry.label}</h2>
               <p>${entry.description || ""}</p>
-              <span class="hub-card-station">${entry.station || entry.id}</span>
+              <span class="hub-card-action">Open dashboard</span>
             </a>
           `
         )

@@ -26,11 +26,11 @@ from urllib.request import Request, urlopen
 PORT = int(os.environ.get("PORT", "8000"))
 if getattr(sys, "frozen", False):
     if hasattr(sys, "_MEIPASS"):
-        ROOT = Path(sys._MEIPASS)
+        ROOT = Path(sys._MEIPASS).resolve()
     else:
-        ROOT = Path(__file__).resolve().parent / "SPI"
+        ROOT = (Path(__file__).resolve().parent / "SPI").resolve()
 else:
-    ROOT = Path(__file__).resolve().parent / "SPI"
+    ROOT = (Path(__file__).resolve().parent / "SPI").resolve()
 
 ES_URL = os.environ.get(
     "ES_URL", "https://elastic-sac-platinum.elkaas.flex.com"
@@ -53,28 +53,49 @@ ES_USERNAME = os.environ.get(
 ES_PASSWORD = os.environ.get("ES_PASSWORD", "7Efuei>L")
 ES_TIMEOUT_SEC = int(os.environ.get("ES_TIMEOUT_SEC", "300"))
 
-# Only these paths may be served over HTTP (prevents path traversal)
-ALLOWED_STATIC = frozenset(
-    {
-        "index.html",
-        "magicray.html",
-        "analysis.html",
-        "pad-analysis.html",
-    }
-)
-
-ALLOWED_PREFIXES = ("shared/", "dashboards/")
-STATIC_SUFFIXES = frozenset({".html", ".js", ".css"})
+STATIC_SUFFIXES = frozenset({".html", ".js", ".css", ".ico", ".svg", ".png", ".map"})
 CHUNK_SIZE = 65536  # 64KB chunks for writing large responses
 
+# Short URLs → files under SPI/
+PATH_ALIASES = {
+    "spi": "dashboards/spi/index.html",
+    "spi/": "dashboards/spi/index.html",
+    "magicray": "dashboards/magicray/index.html",
+    "magicray/": "dashboards/magicray/index.html",
+    "magicray.html": "dashboards/magicray/index.html",
+    "analysis.html": "dashboards/spi/analysis.html",
+    "pad-analysis.html": "dashboards/spi/pad-analysis.html",
+}
 
-def is_allowed_static(path: str) -> bool:
-    if path in ALLOWED_STATIC:
-        return True
-    if any(path.startswith(prefix) for prefix in ALLOWED_PREFIXES):
-        suffix = Path(path).suffix.lower()
-        return suffix in STATIC_SUFFIXES
-    return False
+
+def normalize_name(path: str) -> str:
+    return path.lstrip("/").replace("\\", "/")
+
+
+def resolve_static(name: str) -> Path | None:
+    """Return a file under ROOT, or None if missing / outside the tree."""
+    name = PATH_ALIASES.get(name, name)
+    if not name or name.endswith("/"):
+        name = f"{name}index.html" if name else "index.html"
+
+    try:
+        candidate = (ROOT / name).resolve()
+        candidate.relative_to(ROOT)
+    except (OSError, ValueError):
+        return None
+
+    if candidate.is_dir():
+        candidate = (candidate / "index.html").resolve()
+        try:
+            candidate.relative_to(ROOT)
+        except ValueError:
+            return None
+
+    if not candidate.is_file():
+        return None
+    if candidate.suffix.lower() not in STATIC_SUFFIXES:
+        return None
+    return candidate
 
 
 def es_request(url: str, body: bytes) -> tuple[int, bytes]:
@@ -128,12 +149,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
+        name = normalize_name(path)
         if path in ("", "/"):
-            self._serve_file("index.html")
-            return
-        name = path.lstrip("/")
-        if is_allowed_static(name):
-            self._serve_file(name)
+            name = "index.html"
+        file_path = resolve_static(name)
+        if file_path:
+            self._serve_path(file_path, name)
             return
         self.send_error(404, f"Not found: {path}")
 
@@ -195,16 +216,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self._write_data(data)
 
-    def _serve_file(self, name: str) -> None:
-        file_path = (ROOT / name).resolve()
-        if not str(file_path).startswith(str(ROOT)) or not file_path.is_file():
-            self.send_error(404, f"Missing file: {name}")
-            return
+    def _serve_path(self, file_path: Path, name: str) -> None:
         data = file_path.read_bytes()
         mime, _ = mimetypes.guess_type(name)
         self.send_response(200)
         self._cors()
         self.send_header("Content-Type", mime or "application/octet-stream")
+        self.send_header("Cache-Control", "no-cache")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self._write_data(data)
@@ -222,7 +240,9 @@ if __name__ == "__main__":
     print(f"Serving static root: {ROOT}")
     print(f"Index exists: {(ROOT / 'index.html').is_file()}")
     server = ThreadingHTTPServer(("0.0.0.0", PORT), DashboardHandler)
-    print(f"Dashboard:  http://0.0.0.0:{PORT}/")
+    print(f"Hub:        http://0.0.0.0:{PORT}/")
+    print(f"SPI:        http://0.0.0.0:{PORT}/spi")
+    print(f"MagicRay:   http://0.0.0.0:{PORT}/magicray")
     print(f"ELK proxy:  http://0.0.0.0:{PORT}/search")
     print(f"Board Index : {BOARD_SEARCH_URL}")
     print(f"Detail Index: {DETAIL_SEARCH_URL}")
