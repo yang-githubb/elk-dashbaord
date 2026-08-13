@@ -72,30 +72,41 @@ def normalize_name(path: str) -> str:
     return path.lstrip("/").replace("\\", "/")
 
 
+def _norm_path(path: Path) -> str:
+    text = os.path.normcase(os.path.abspath(str(path)))
+    if text.startswith("\\\\?\\"):
+        text = text[4:]
+    return text
+
+
+def _is_under_root(path: Path) -> bool:
+    root = _norm_path(ROOT)
+    child = _norm_path(path)
+    return child == root or child.startswith(root + os.sep)
+
+
 def resolve_static(name: str) -> Path | None:
     """Return a file under ROOT, or None if missing / outside the tree."""
     name = PATH_ALIASES.get(name, name)
+    name = normalize_name(name)
     if not name or name.endswith("/"):
-        name = f"{name}index.html" if name else "index.html"
+        name = f"{name}index.html"
 
-    try:
-        candidate = (ROOT / name).resolve()
-        candidate.relative_to(ROOT)
-    except (OSError, ValueError):
+    if ".." in Path(name).parts:
+        return None
+
+    candidate = (ROOT / name).resolve()
+    if not _is_under_root(candidate):
         return None
 
     if candidate.is_dir():
         candidate = (candidate / "index.html").resolve()
-        try:
-            candidate.relative_to(ROOT)
-        except ValueError:
+        if not _is_under_root(candidate):
             return None
 
-    if not candidate.is_file():
-        return None
-    if candidate.suffix.lower() not in STATIC_SUFFIXES:
-        return None
-    return candidate
+    if candidate.is_file() and candidate.suffix.lower() in STATIC_SUFFIXES:
+        return candidate
+    return None
 
 
 def es_request(url: str, body: bytes) -> tuple[int, bytes]:
@@ -156,6 +167,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if file_path:
             self._serve_path(file_path, name)
             return
+        print(f"[server] 404 {path} (name={name!r} root={ROOT})")
         self.send_error(404, f"Not found: {path}")
 
     def do_POST(self) -> None:
