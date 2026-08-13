@@ -7,6 +7,25 @@ window.DASHBOARD_SCHEMAS.MAGICRAY = {
   station: "FQI_AUTOTEST",
   stationValue: "FQI_AUTOTEST",
   isPadLevel: true,
+  indexMode: "single",
+  bodyClass: "magicray",
+
+  features: {
+    boardList: false,
+    boardAnalysis: false,
+    padAnalysis: false,
+    paretoDrillDown: false,
+  },
+
+  labels: {
+    pageTitle: "MagicRay Dashboard",
+    boardOverview: "Board Overview",
+    padOverview: "Component Overview",
+    paretoTitle: "Failure Pareto Analysis",
+    padTotal: "Total Report Fail",
+  },
+
+  pages: {},
 
   boardHint: "Click a source file to view component inspection data",
   detailTitle: "Components for",

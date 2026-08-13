@@ -1,128 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MagicRay Dashboard</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-
-<body class="magicray">
-  <header class="header">
-    <div class="header-title">
-      <h1>MagicRay Dashboard</h1>
-      <span id="status" class="status status-bad">Disconnected</span>
-    </div>
-
-    <nav class="dashboard-tabs">
-      <a href="index.html" class="dashboard-tab">SPI Dashboard</a>
-      <a href="magicray.html" class="dashboard-tab dashboard-tab-active">MagicRay Dashboard</a>
-    </nav>
-
-    <div class="filters">
-      <label class="filter">
-        <span>Time</span>
-        <select id="time"></select>
-      </label>
-
-      <label class="filter">
-        <span>Line</span>
-        <select id="line">
-          <option value="">All lines</option>
-        </select>
-      </label>
-
-      <label class="filter">
-        <span>Model</span>
-        <select id="model">
-          <option value="">All models</option>
-        </select>
-      </label>
-
-      <button type="button" id="refresh" class="btn">Refresh</button>
-    </div>
-
-    <div class="meta">
-      <span id="updated">—</span>
-      <span id="mode-label">—</span>
-    </div>
-  </header>
-
-  <div id="error" class="banner banner-error hidden" role="alert">
-    <span id="error-text"></span>
-    <button type="button" id="retry" class="btn btn-inline">Retry</button>
-  </div>
-
-  <main class="main">
-    <section class="overview-section">
-      <div class="overview-grid">
-        <div id="board-overview-card" class="overview-card overview-card-clickable">
-          <div class="overview-header">
-            <span class="overview-title">Board Overview</span>
-          </div>
-          <div id="board-overview-content">Loading...</div>
-        </div>
-
-        <div id="pad-overview-card" class="overview-card overview-card-clickable">
-          <div class="overview-header">
-            <span class="overview-title">Component Overview</span>
-          </div>
-          <div id="pad-overview-content">Loading...</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head panel-head-split">
-        <div>
-          <h3>Failure Pareto Analysis</h3>
-        </div>
-        <span id="loading-tag" class="loading-tag hidden">Loading…</span>
-      </div>
-      <div id="pareto-chart"></div>
-    </section>
-
-    <section id="pad-panel" class="panel panel-table hidden">
-      <div class="panel-head panel-head-split">
-        <div class="panel-head-left">
-          <button type="button" id="back-boards" class="btn btn-back">← Boards</button>
-          <button type="button" id="export-board" class="btn">Export Excel</button>
-          <h2 id="pad-detail-heading">Components for <span id="pad-serial-label" class="serial-label"></span></h2>
-        </div>
-        <span id="pad-loading-tag" class="loading-tag hidden">Loading…</span>
-      </div>
-      <div class="pad-toolbar">
-        <input type="text" id="pad-search" class="search-box" placeholder="Search component, result..." />
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead id="pad-thead"></thead>
-          <tbody id="pad-tbody"></tbody>
-        </table>
-      </div>
-      <div class="pager">
-        <button type="button" id="pad-prev" class="btn">Previous</button>
-        <span id="pad-page-info">Page 1 of 1</span>
-        <button type="button" id="pad-next" class="btn">Next</button>
-      </div>
-    </section>
-  </main>
-
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="config/environments.js"></script>
-  <script src="config/schema.magicray.js"></script>
-  <script src="config/settings.js"></script>
+  <title>Redirecting…</title>
   <script>
-    window.DASHBOARD_USER_CONFIG = window.DASHBOARD_USER_CONFIG || {};
-    window.DASHBOARD_USER_CONFIG.schema = "MAGICRAY";
+    location.replace("dashboards/magicray/index.html" + location.search);
   </script>
-  <script src="config/bootstrap.js"></script>
-
-  <script src="js/config-access.js"></script>
-  <script src="js/es-queries.js"></script>
-  <script src="js/es-client.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/app.js"></script>
+</head>
+<body>
+  <p><a href="dashboards/magicray/index.html">Continue to MagicRay Dashboard</a></p>
 </body>
 </html>

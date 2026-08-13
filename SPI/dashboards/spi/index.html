@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SMT Board Dashboard</title>
+  <link rel="stylesheet" href="../../shared/styles.css" />
+</head>
+
+<body>
+  <header class="header">
+    <div class="header-title">
+      <h1>SMT Board Dashboard</h1>
+      <span id="status" class="status status-bad">Disconnected</span>
+    </div>
+
+    <nav class="dashboard-tabs"></nav>
+
+    <div class="filters">
+      <label class="filter">
+        <span>Time</span>
+        <select id="time"></select>
+      </label>
+
+      <label class="filter">
+        <span>Line</span>
+        <select id="line">
+          <option value="">All lines</option>
+        </select>
+      </label>
+
+      <label class="filter">
+        <span>Model</span>
+        <select id="model">
+          <option value="">All models</option>
+        </select>
+      </label>
+
+      <button type="button" id="refresh" class="btn">Refresh</button>
+    </div>
+
+    <div class="meta">
+      <span id="updated">—</span>
+      <span id="mode-label">—</span>
+    </div>
+  </header>
+
+  <div id="error" class="banner banner-error hidden" role="alert">
+    <span id="error-text"></span>
+    <button type="button" id="retry" class="btn btn-inline">Retry</button>
+  </div>
+
+  <main class="main">
+    <section class="overview-section">
+      <div class="overview-grid">
+        <div id="board-overview-card" class="overview-card overview-card-clickable">
+          <div class="overview-header">
+            <span class="overview-title">Board Overview</span>
+          </div>
+          <div id="board-overview-content">Loading...</div>
+        </div>
+
+        <div id="pad-overview-card" class="overview-card overview-card-clickable">
+          <div class="overview-header">
+            <span class="overview-title">Pad Overview</span>
+          </div>
+          <div id="pad-overview-content">Loading...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h3>Pad Failure Pareto Analysis</h3>
+      </div>
+      <div id="pareto-chart"></div>
+    </section>
+
+    <section id="board-panel" class="panel panel-table">
+      <div class="panel-head panel-head-split">
+        <div>
+          <h2>Board Serial Numbers</h2>
+          <span class="panel-hint">Click a serial to view pad inspection data</span>
+        </div>
+        <span id="loading-tag" class="loading-tag hidden">Updating…</span>
+      </div>
+
+      <div class="board-toolbar">
+        <input type="text" id="board-search" class="search-box" placeholder="Search board serial..." />
+        <button type="button" id="export-boards" class="btn">Export Boards</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead id="board-thead"></thead>
+          <tbody id="board-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <button type="button" id="board-prev" class="btn">Previous</button>
+        <span id="board-page-info">Page 1 of 1</span>
+        <button type="button" id="board-next" class="btn">Next</button>
+      </div>
+    </section>
+
+    <section id="pad-panel" class="panel panel-table hidden">
+      <div class="panel-head panel-head-split">
+        <div class="panel-head-left">
+          <button type="button" id="back-boards" class="btn btn-back">← Boards</button>
+          <button type="button" id="export-board" class="btn">Export Excel</button>
+          <h2 id="pad-detail-heading">Pads for <span id="pad-serial-label" class="serial-label"></span></h2>
+        </div>
+        <span id="pad-loading-tag" class="loading-tag hidden">Loading…</span>
+      </div>
+      <div class="pad-toolbar">
+        <input type="text" id="pad-search" class="search-box" placeholder="Search pad, component, result..." />
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead id="pad-thead"></thead>
+          <tbody id="pad-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <button type="button" id="pad-prev" class="btn">Previous</button>
+        <span id="pad-page-info">Page 1 of 1</span>
+        <button type="button" id="pad-next" class="btn">Next</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="../../shared/config/environments.js"></script>
+  <script src="../../shared/config/user.js"></script>
+  <script src="./schema.js"></script>
+  <script src="../../shared/config/settings.js"></script>
+  <script>
+    window.DASHBOARD_PAGE = { id: "spi", schemaKey: "SPI" };
+    window.DASHBOARD_USER_CONFIG = {
+      ...(window.DASHBOARD_USER_CONFIG || {}),
+      schema: "SPI",
+    };
+  </script>
+  <script src="../../shared/config/bootstrap.js"></script>
+  <script src="../../shared/js/registry.js"></script>
+  <script src="../../shared/js/shell.js"></script>
+  <script src="../../shared/js/config-access.js"></script>
+  <script src="../../shared/js/es-queries.js"></script>
+  <script src="../../shared/js/es-client.js"></script>
+  <script src="../../shared/js/ui.js"></script>
+  <script src="../../shared/js/app.js"></script>
+</body>
+
+</html>

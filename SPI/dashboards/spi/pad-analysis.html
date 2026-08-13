@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPI Failure Analysis</title>
+  <link rel="stylesheet" href="../../shared/styles.css">
+</head>
+
+<body>
+  <div class="container">
+    <div class="panel">
+      <div class="panel-head">
+        <h2 id="failure-title">Failure Analysis</h2>
+        <button id="back-dashboard">← Dashboard</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Failure by Line</h3>
+      </div>
+      <table class="data-table">
+        <thead id="line-failure-thead"></thead>
+        <tbody id="line-failure-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Failure by Model</h3>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead id="model-failure-thead"></thead>
+          <tbody id="model-failure-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="../../shared/config/environments.js"></script>
+  <script src="../../shared/config/user.js"></script>
+  <script src="./schema.js"></script>
+  <script src="../../shared/config/settings.js"></script>
+  <script>
+    window.DASHBOARD_PAGE = { id: "spi", schemaKey: "SPI" };
+    window.DASHBOARD_USER_CONFIG = {
+      ...(window.DASHBOARD_USER_CONFIG || {}),
+      schema: "SPI",
+    };
+  </script>
+  <script src="../../shared/config/bootstrap.js"></script>
+  <script src="../../shared/js/registry.js"></script>
+  <script src="../../shared/js/shell.js"></script>
+  <script src="../../shared/js/config-access.js"></script>
+  <script src="../../shared/js/es-queries.js"></script>
+  <script src="../../shared/js/es-client.js"></script>
+  <script src="../../shared/js/ui.js"></script>
+  <script src="./js/pad-analysis.js"></script>
+</body>
+
+</html>

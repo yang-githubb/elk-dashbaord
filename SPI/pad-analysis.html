@@ -1,76 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SPI Failure Analysis</title>
-
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <title>Redirecting…</title>
+  <script>
+    location.replace("dashboards/spi/pad-analysis.html" + location.search);
+  </script>
 </head>
-
 <body>
-
-    <div class="container">
-
-        <div class="panel">
-
-            <div class="panel-head">
-                <h2 id="failure-title">
-                    Failure Analysis
-                </h2>
-
-                <button id="back-dashboard">
-                    ← Dashboard
-                </button>
-            </div>
-
-        </div>
-
-        <div class="panel">
-
-            <div class="panel-head">
-                <h3>Failure by Line</h3>
-            </div>
-
-            <table class="data-table">
-                <thead id="line-failure-thead"></thead>
-                <tbody id="line-failure-tbody"></tbody>
-            </table>
-
-        </div>
-
-        <div class="panel">
-
-            <div class="panel-head">
-                <h3>Failure by Model</h3>
-            </div>
-
-            <div class="table-scroll">
-                <table class="data-table">
-                    <thead id="model-failure-thead"></thead>
-                    <tbody id="model-failure-tbody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Config -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="config/environments.js"></script>
-    <script src="config/schema.spi.js"></script>
-    <script src="config/settings.js"></script>
-    <script src="config/bootstrap.js"></script>
-
-    <!-- App -->
-    <script src="js/config-access.js"></script>
-    <script src="js/es-queries.js"></script>
-    <script src="js/es-client.js"></script>
-    <script src="js/ui.js"></script>
-
-    <!-- Analysis -->
-    <script src="js/pad-analysis.js"></script>
-
+  <p><a href="dashboards/spi/pad-analysis.html">Continue to SPI Pad Analysis</a></p>
 </body>
-
 </html>

@@ -47,7 +47,13 @@
   Object.assign(Dashboard.config, {
     schemaId: schema.id,
     schemaLabel: schema.label,
+    schemaKey,
     isPadLevel: schema.isPadLevel !== false,
+    indexMode: schema.indexMode || "dual",
+    bodyClass: schema.bodyClass || "",
+    features: { ...(schema.features || {}) },
+    labels: { ...(schema.labels || {}) },
+    pages: { ...(schema.pages || {}) },
     boardHint: schema.boardHint || "Click a serial to view inspection data",
     detailTitle: schema.detailTitle || "Inspections for",
     detailCountLabel: schema.detailCountLabel || "records",

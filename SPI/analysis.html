@@ -1,98 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SPI Analysis</title>
-
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <title>Redirecting…</title>
+  <script>
+    location.replace("dashboards/spi/analysis.html" + location.search);
+  </script>
 </head>
-
 <body>
-
-  <!-- Header -->
-  <header class="header">
-    <div class="header-title">
-      <h1>SPI Analysis</h1>
-    </div>
-  </header>
-
-  <!-- Main Content -->
-  <main class="main">
-
-    <!-- Analysis Header -->
-    <section class="panel">
-
-      <div class="panel-head panel-head-split">
-
-        <div>
-          <h2>Board Analysis</h2>
-          <span class="panel-hint">
-            KPI breakdown by Line and Model
-          </span>
-        </div>
-
-        <button
-          type="button"
-          id="back-dashboard"
-          class="btn">
-          ← Dashboard
-        </button>
-
-      </div>
-
-    </section>
-
-    <!-- Line KPI -->
-    <section class="panel">
-
-      <div class="panel-head">
-        <h3>Line KPI</h3>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead id="line-kpi-thead"></thead>
-          <tbody id="line-kpi-tbody"></tbody>
-        </table>
-      </div>
-
-    </section>
-
-    <!-- Model KPI -->
-    <section class="panel">
-
-      <div class="panel-head">
-        <h3>Model KPI</h3>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead id="model-kpi-thead"></thead>
-          <tbody id="model-kpi-tbody"></tbody>
-        </table>
-      </div>
-
-    </section>
-
-  </main>
-
-  <!-- Config -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="config/environments.js"></script>
-  <script src="config/schema.spi.js"></script>
-  <script src="config/settings.js"></script>
-  <script src="config/bootstrap.js"></script>
-
-  <!-- App -->
-  <script src="js/config-access.js"></script>
-  <script src="js/es-queries.js"></script>
-  <script src="js/es-client.js"></script>
-  <script src="js/ui.js"></script>
-
-  <!-- Analysis -->
-  <script src="js/analysis.js"></script>
-
+  <p><a href="dashboards/spi/analysis.html">Continue to SPI Analysis</a></p>
 </body>
 </html>

@@ -870,3 +870,56 @@ td {
 .overview-stats {
     width: 100% !important;
 }
+
+/* Hub landing page */
+.hub-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+.hub-intro {
+  color: var(--muted);
+  margin: 0 0 1.5rem;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.hub-card {
+  display: block;
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.hub-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.hub-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+}
+
+.hub-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.hub-card-station {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-family: var(--mono);
+}

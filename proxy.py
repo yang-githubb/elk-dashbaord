@@ -59,20 +59,22 @@ ALLOWED_STATIC = frozenset(
         "index.html",
         "magicray.html",
         "analysis.html",
-        "styles.css",
-        "config.js",
         "pad-analysis.html",
     }
 )
 
-ALLOWED_PREFIXES = ("config/", "js/")
+ALLOWED_PREFIXES = ("shared/", "dashboards/")
+STATIC_SUFFIXES = frozenset({".html", ".js", ".css"})
 CHUNK_SIZE = 65536  # 64KB chunks for writing large responses
 
 
 def is_allowed_static(path: str) -> bool:
     if path in ALLOWED_STATIC:
         return True
-    return path.endswith(".js") and path.startswith(ALLOWED_PREFIXES)
+    if any(path.startswith(prefix) for prefix in ALLOWED_PREFIXES):
+        suffix = Path(path).suffix.lower()
+        return suffix in STATIC_SUFFIXES
+    return False
 
 
 def es_request(url: str, body: bytes) -> tuple[int, bytes]:
