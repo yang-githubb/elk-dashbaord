@@ -594,7 +594,7 @@ ${buildPieSvg(
         const result = bucket.key;
 
         const count =
-          bucket.inspections?.value ?? 0;
+          bucket.doc_count ?? 0;
 
         const normalized = D.normalizeResult(result);
 
