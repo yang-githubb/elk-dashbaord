@@ -479,6 +479,22 @@
         });
       }
 
+      const boardOverview = $("board-overview-card");
+      if (boardOverview) {
+        const canOpenBoardAnalysis = D.hasFeature("boardAnalysis");
+        boardOverview.classList.toggle("overview-card-clickable", canOpenBoardAnalysis);
+        boardOverview.onclick = canOpenBoardAnalysis
+          ? () => {
+              const query = new URLSearchParams({
+                time: D.state.time,
+                line: D.state.line,
+                model: D.state.model,
+              });
+              window.location.href = `${D.pageUrl("analysis")}?${query.toString()}`;
+            }
+          : null;
+      }
+
       const padOverview = $("pad-overview-card");
       if (padOverview) {
         const canOpenPadAnalysis = D.hasFeature("padAnalysis");
@@ -489,8 +505,9 @@
                 time: D.state.time,
                 line: D.state.line,
                 model: D.state.model,
+                view: "pad",
               });
-              window.location.href = `${D.pageUrl("padAnalysis")}?${query.toString()}`;
+              window.location.href = `${D.pageUrl("analysis")}?${query.toString()}`;
             }
           : null;
       }

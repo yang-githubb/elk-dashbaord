@@ -182,6 +182,9 @@
 
     boardBreakdownAgg() {
       return {
+        boards: {
+          cardinality: { field: "array_barcode" },
+        },
         board_results: {
           terms: { field: this.boardResultField(), size: 10 },
           aggs: {
@@ -190,6 +193,37 @@
             },
           },
         },
+      };
+    },
+
+    buildPadAnalysisAggs() {
+      const fields = D.getFields();
+      const lineField = D.esField(fields.line);
+      const modelField = D.esField(fields.model);
+      const resultField = this.padResultField();
+      const kpi = D.getKpi();
+      const breakdown = {
+        boards: {
+          cardinality: { field: "spi_array_barcode.keyword" },
+        },
+        count_good: {
+          filter: this.buildTermsFilter(resultField, kpi.good || ["GOOD"]),
+        },
+        count_pass: {
+          filter: this.buildTermsFilter(resultField, kpi.pass || []),
+        },
+        count_fail: {
+          filter: this.buildTermsFilter(resultField, this.padFailValues()),
+        },
+      };
+
+      return {
+        lines: lineField
+          ? { terms: { field: lineField, size: 100 }, aggs: breakdown }
+          : emptyTermsAgg(),
+        models: modelField
+          ? { terms: { field: modelField, size: 200 }, aggs: breakdown }
+          : emptyTermsAgg(),
       };
     },
 
