@@ -12,7 +12,7 @@ window.DASHBOARD_REGISTRY = [
     schemaKey: "SPI",
     label: "SPI",
     description: "Solder paste inspection — board yield, pad defects, and serial search.",
-    path: "/spi",
+    path: "/dashboards/spi/index.html",
     station: "SPI",
   },
   {
@@ -20,7 +20,7 @@ window.DASHBOARD_REGISTRY = [
     schemaKey: "MAGICRAY",
     label: "MagicRay",
     description: "FQI autotest — component results and failure Pareto.",
-    path: "/magicray",
+    path: "/dashboards/magicray/index.html",
     station: "FQI",
   },
 ];

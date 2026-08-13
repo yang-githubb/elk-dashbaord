@@ -163,9 +163,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
         name = normalize_name(path)
         if path in ("", "/"):
             name = "index.html"
+        elif name in PATH_ALIASES:
+            target = "/" + PATH_ALIASES[name].lstrip("/")
+            self.send_response(302)
+            self._cors()
+            self.send_header("Location", target)
+            self.end_headers()
+            return
         file_path = resolve_static(name)
         if file_path:
-            self._serve_path(file_path, name)
+            self._serve_path(file_path)
             return
         print(f"[server] 404 {path} (name={name!r} root={ROOT})")
         self.send_error(404, f"Not found: {path}")
@@ -228,9 +235,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self._write_data(data)
 
-    def _serve_path(self, file_path: Path, name: str) -> None:
+    def _serve_path(self, file_path: Path) -> None:
         data = file_path.read_bytes()
-        mime, _ = mimetypes.guess_type(name)
+        mime, _ = mimetypes.guess_type(file_path.name)
+        if file_path.suffix.lower() == ".html":
+            mime = "text/html; charset=utf-8"
+        elif file_path.suffix.lower() == ".js":
+            mime = "text/javascript; charset=utf-8"
+        elif file_path.suffix.lower() == ".css":
+            mime = "text/css; charset=utf-8"
         self.send_response(200)
         self._cors()
         self.send_header("Content-Type", mime or "application/octet-stream")
