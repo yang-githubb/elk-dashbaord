@@ -1,8 +1,27 @@
 # SMT Board Dashboard (ELK)
 
-Factory dashboards for **SPI** solder-paste inspection and **MagicRay** FQI autotest. Data comes from Elasticsearch. The UI is plain HTML, CSS, and JavaScript — no build step, no npm.
+Factory dashboards for **SPI** solder-paste inspection and **MagicRay** FQI autotest. Data comes from Elasticsearch.
 
-The browser app lives in `web/`. `proxy.py` serves that folder as `/` and forwards search requests to Elasticsearch so the browser never talks to the cluster directly.
+The UI is plain HTML, CSS, and JavaScript. There is no build step and no npm. `proxy.py` is the only backend: it serves the files in `web/` and forwards search requests to Elasticsearch so the browser never talks to the cluster.
+
+---
+
+## Contents
+
+1. [Quick start](#quick-start)
+2. [Pages and URLs](#pages-and-urls)
+3. [Project layout](#project-layout)
+4. [How SPI data is stored](#how-spi-data-is-stored)
+5. [What each SPI page does](#what-each-spi-page-does)
+6. [How KPIs are counted](#how-kpis-are-counted)
+7. [Pad-result types](#pad-result-types)
+8. [Why pad queries are slower](#why-pad-queries-are-slower)
+9. [The proxy](#the-proxy)
+10. [Configuration](#configuration)
+11. [Shared JavaScript](#shared-javascript)
+12. [MagicRay](#magicray)
+13. [Adding a dashboard](#adding-a-dashboard)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -15,7 +34,7 @@ The browser app lives in `web/`. `proxy.py` serves that folder as `/` and forwar
 start.bat
 ```
 
-That starts `proxy.py` and opens http://127.0.0.1:8000/ (the hub page).
+That starts `proxy.py` and opens http://127.0.0.1:8000/ (the hub).
 
 Or run the proxy yourself:
 
@@ -25,32 +44,40 @@ python proxy.py
 
 Then open http://127.0.0.1:8000/
 
+The startup log must say it is serving `...\web` and `Index exists: True`. If it still prints an `SPI` folder, you are running an old process.
+
 ### After every git pull
 
-**Stop the old `python proxy.py` process and start a new one.** An already-running proxy keeps serving the old JS, HTML, and `/search` routes. Pulling files onto disk is not enough.
+**Stop the old `python proxy.py` process and start a new one.** An already-running proxy keeps serving old HTML, JS, and `/search` routes. Pulling files onto disk is not enough.
 
-On Windows: close the minimized “ELK Dashboard” window, or end the Python process in Task Manager, then run `start.bat` again. Hard-refresh the browser (`Ctrl+F5`) so it does not reuse cached JS.
+On Windows: close the minimized “ELK Dashboard” window, or end Python in Task Manager, then run `start.bat` again. Hard-refresh the browser with `Ctrl+F5`.
 
 ---
 
-## What you see in the browser
+## Pages and URLs
+
+`proxy.py` serves `web/` as `/`. Browser paths do **not** include the word `web`.
 
 | URL | Page |
 |-----|------|
 | `/` | Hub — pick SPI or MagicRay |
 | `/dashboards/spi/index.html` | SPI dashboard |
-| `/dashboards/spi/analysis.html` | SPI board analysis (line / model) |
-| `/dashboards/spi/analysis.html?view=pad` | SPI pad analysis (line / model) |
+| `/dashboards/spi/analysis.html` | SPI board analysis (by line and model) |
+| `/dashboards/spi/analysis.html?view=pad` | SPI pad analysis (by line and model) |
 | `/dashboards/spi/pad-analysis.html?failure=EXCESSIVE_VOLUME` | One pad-fail type by line and model |
 | `/dashboards/magicray/index.html` | MagicRay dashboard |
 
-Short aliases `/spi` and `/magicray` **302-redirect** to the HTML paths above. Do not bookmark the extensionless URLs: Windows can download them as a file instead of rendering HTML.
+Short aliases **302-redirect** to the HTML files above:
 
-Old bookmarks still work via small redirect files:
+| Alias | Goes to |
+|-------|---------|
+| `/spi` | `/dashboards/spi/index.html` |
+| `/magicray` | `/dashboards/magicray/index.html` |
+| `/magicray.html` | `/dashboards/magicray/index.html` |
+| `/analysis.html` | `/dashboards/spi/analysis.html` |
+| `/pad-analysis.html` | `/dashboards/spi/pad-analysis.html` |
 
-- `/analysis.html` → SPI board analysis
-- `/pad-analysis.html` → SPI pad-failure analysis
-- `/magicray.html` → MagicRay dashboard
+Prefer the `.html` paths. Bookmarking `/spi` used to download a file on Windows because the server had no file extension to pick a MIME type. The 302 exists so old bookmarks still open in the browser.
 
 ---
 
@@ -58,41 +85,28 @@ Old bookmarks still work via small redirect files:
 
 ```
 elk-dashboard/
-  README.md                        This file
-  ADDING-A-DASHBOARD.md            Checklist for a new data source
-  proxy.py                         Static server + ES proxy
-  start.bat                        Starts proxy.py and opens the hub
-  web/                             Everything the browser is served
-    index.html                     Hub — pick SPI or MagicRay
-    shared/                        Code used by every dashboard
+  README.md                      This file
+  ADDING-A-DASHBOARD.md          Short checklist for a new data source
+  proxy.py                       Static server + Elasticsearch proxy
+  start.bat                      Starts proxy.py and opens the hub
+  web/                           Everything the browser is served
+    index.html                   Hub
+    shared/                      Core used by every dashboard
       styles.css
-      config/
-        environments.js            Cluster URL + proxy path
-        user.js                    Which environment to use
-        settings.js                Time ranges, page size, timeouts
-        bootstrap.js               Merges the above into Dashboard.config
-      js/
-        registry.js                Hub cards + top-nav entries
-        shell.js                   Top navigation
-        config-access.js           Helpers to read schema/config
-        es-queries.js              Elasticsearch query / aggregation builders
-        es-client.js               POST /search and POST /search-board
-        ui.js                      KPI cards, tables, Pareto chart
-        app.js                     Dashboard controller (load, filter, export)
+      config/                    Cluster, time ranges, bootstrap
+      js/                        Queries, UI, dashboard controller
     dashboards/
-      spi/                         SPI solder-paste inspection
-        index.html
-        schema.js                  SPI field map + KPI rules
-        analysis.html
-        pad-analysis.html
-        js/analysis.js
-        js/pad-analysis.js
-      magicray/                    MagicRay FQI autotest
-        index.html
-        schema.js                  Assumed field map (not confirmed from mapping)
+      spi/                       SPI only (schema + pages)
+      magicray/                  MagicRay only (schema + page)
 ```
 
-`proxy.py` serves `web/` as `/`. A request for `/dashboards/spi/index.html` is the file `web/dashboards/spi/index.html`. Short aliases (`/spi`, `/magicray`, `/analysis.html`) are 302-redirects in `proxy.py`, not extra HTML files.
+| Disk path | Browser URL |
+|-----------|-------------|
+| `web/index.html` | `/` |
+| `web/dashboards/spi/index.html` | `/dashboards/spi/index.html` |
+| `web/shared/js/app.js` | `/shared/js/app.js` |
+
+Root of the repo is docs and the server. `web/` is the product UI. `web/dashboards/spi/` is one data source, not the whole app.
 
 ---
 
@@ -100,105 +114,117 @@ elk-dashboard/
 
 SPI uses **two Elasticsearch indices**. They are not interchangeable.
 
-| Role | Index (default in `proxy.py`) | Browser route |
-|------|-------------------------------|---------------|
+| Role | Default index in `proxy.py` | Browser route |
+|------|-----------------------------|----------------|
 | Board / inspection header | `flexh1smtmachinesdata00589-spi-board` | `POST /search-board` |
 | Pad / detail rows | `flexh1smtmachinesdata00589-jax_process_optimizations*` | `POST /search` |
 
-One spi-board document is **one board inspection**. The same `array_barcode` can appear many times (retest). KPI totals count **documents**, not unique barcodes.
-
-One jax document is **one pad** on one inspection.
+- One **spi-board** document = one board inspection. The same `array_barcode` can appear many times (retest).
+- One **jax** document = one pad on one inspection.
 
 ### How a board joins to its pads
 
-| spi-board field | jax field | Meaning |
-|-----------------|-----------|---------|
+| spi-board | jax | Meaning |
+|-----------|-----|---------|
 | `array_barcode` | `spi_array_barcode` | Board serial |
 | `source_file` | `source_file` | Same inspection file |
 | `pcb_name` | `spi_pcb_name` | Model / PCB name |
 | `inspection_date` | `spi_inspection_date` | Inspection time |
 | `pcb_result` | `spi_pcb_result` | Board-level result (copied onto pads) |
-| — | `spi_pad_result` | **Pad-level** result (this is what pad KPIs use) |
+| — | `spi_pad_result` | **Pad-level** result (pad KPIs use this) |
 
-A board can be `pcb_result: PASS` while some pads are `spi_pad_result: EXCESSIVE_VOLUME`. Pad overview always uses jax. Board overview always uses spi-board.
+A board can be `pcb_result: PASS` while some pads are `spi_pad_result: EXCESSIVE_VOLUME`.
+
+- Board Overview and board analysis → **spi-board only**
+- Pad Overview, Pareto, pad analysis, pad table → **jax only**
 
 ### Field types (this matters for queries)
 
-- **spi-board** fields used here are **native keyword**. Query them as `line`, `pcb_name`, `array_barcode`. Do **not** append `.keyword`.
-- **jax** text fields need `.keyword` for exact terms aggregations: `spi_pad_result.keyword`, `spi_array_barcode.keyword`, `spi_pcb_name.keyword`, `line.keyword`.
+- **spi-board** fields used here are **native keyword**. Query `line`, `pcb_name`, `array_barcode` as-is. Do **not** append `.keyword`.
+- **jax** text fields need `.keyword` for exact terms: `spi_pad_result.keyword`, `spi_array_barcode.keyword`, `spi_pcb_name.keyword`, `line.keyword`.
 
-`web/dashboards/spi/schema.js` encodes that. Shared helpers:
+`web/dashboards/spi/schema.js` encodes that. Helpers:
 
-- `D.esBoardField("line")` → `line`
-- `D.esField("line")` → `line.keyword`
+- `D.esBoardField("line")` → `line` (board index)
+- `D.esField("line")` → `line.keyword` (jax index)
 
 ---
 
-## SPI pages, in detail
+## What each SPI page does
 
-### 1. Dashboard (`web/dashboards/spi/index.html`)
+Filters on every SPI page: **time**, **line**, **model**. Default time range is **All time** (`web/shared/config/settings.js` → `defaultTimeRange: "all"`). All time sends **no date filter**, so Elasticsearch scans the whole index.
 
-Filters: time range, line, model. Default time range is **All time** (`settings.js` → `defaultTimeRange: "all"`). All time sends **no date filter**, so Elasticsearch scans the whole index.
+### Dashboard — `web/dashboards/spi/index.html`
 
 **Board Overview** (spi-board)
 
 - Counts every matching board document.
-- `pcb_result`: `GOOD` stays good; `PASS` and `WARNING` count as good on the pie; `NG` is fail.
+- On the pie, `PASS` and `WARNING` are treated as good; `NG` is fail.
 - Click the card → board analysis.
 
 **Pad Overview** (jax)
 
 - Counts every matching pad document.
-- Good = `spi_pad_result` in `GOOD`.
-- Fail = the named defect types in `schema.js` (`EXCESSIVE_VOLUME`, `BRIDGING`, …).
-- Click the card → pad analysis (`analysis.html?view=pad`).
+- Good = `spi_pad_result` `GOOD`. Fail = the defect list in `schema.js`.
+- Click the card → pad analysis (`?view=pad`).
 
-**Pad Failure Pareto**
+**Pad Failure Pareto** (jax)
 
-- One bar per fail type from the same pad aggregation.
-- Click a bar → `pad-analysis.html?failure=<TYPE>`.
+- One bar per fail type, from the same pad aggregation as Pad Overview.
+- Click a bar → pad-failure analysis for that type.
 
 **Board serial table** (spi-board)
 
-- Groups rows by `array_barcode` so you can open pad details for a serial.
-- This grouping is only for navigation. It does **not** change the overview KPI totals.
-- Click a serial → pad table for that barcode (jax).
+- Groups by `array_barcode` so you can open pads for a serial.
+- Grouping is **navigation only**. It does not change overview KPI totals.
+- Click a serial → jax pad rows for that barcode.
 
-**Load order (why the board card appears first)**
+**Load order** (why the board card appears first)
 
-1. Line/model dropdowns load from **spi-board** (small index).
-2. Board KPIs and the board list load from **spi-board** and render immediately.
-3. Pad KPIs and Pareto load from **jax** in the background. The pad card shows “Loading pad KPIs…” until that finishes.
+1. Line and model dropdowns load from spi-board (small index).
+2. Board KPIs and the board list load from spi-board and render immediately.
+3. Pad KPIs and Pareto load from jax in the background. The pad card shows “Loading pad KPIs…” until that finishes.
 4. If jax is slow or errors, the board UI stays up.
 
-Auto-refresh (every 120 seconds) **does not abort** an in-flight All-time pad query. Manual Refresh still starts a new load.
+Auto-refresh (every 120 seconds) does **not** abort an in-flight All-time pad query. The Refresh button still starts a new load.
 
-### 2. Board analysis (`analysis.html`)
+### Board analysis — `analysis.html`
 
-From Board Overview. One table by **line**, one by **model**.
+Opened from Board Overview. Two tables: by line and by model.
 
-Columns: Boards, Good, Pass, Fail, Yield %.
+| Column | Meaning |
+|--------|---------|
+| Boards | spi-board **documents** in that line/model (retests count again) |
+| Good / Pass / Fail | `pcb_result` (`WARNING` maps to Pass) |
+| Yield % | Good / (Good + Pass + Fail) |
 
-- **Boards** = number of spi-board **documents** in that line/model (retests count again).
-- Good / Pass / Fail = `pcb_result` on those documents (`WARNING` maps to Pass).
-- Yield = Good / (Good + Pass + Fail).
-- All models are requested (up to 10,000 distinct `pcb_name` values).
+All models are requested (up to 10,000 distinct `pcb_name` values).
 
-### 3. Pad analysis (`analysis.html?view=pad`)
+### Pad analysis — `analysis.html?view=pad`
 
-From Pad Overview. Same layout, pad metrics only. No board counts mixed in.
+Opened from Pad Overview. Pad metrics only. No board counts mixed in.
 
-Columns: Good, Fail, Pads, Yield %.
+| Column | Meaning |
+|--------|---------|
+| Good / Fail | From `spi_pad_result` |
+| Pads | jax **documents** in that line/model |
+| Yield % | Good / Pads |
 
-- **Pads** = jax **documents** in that line/model.
-- Good / Fail from `spi_pad_result`.
-- Yield = Good / Pads.
+Per line/model the query uses two filters (good and fail), not one bucket per defect type. That stays under Elasticsearch’s aggregation bucket limit. See [Why pad queries are slower](#why-pad-queries-are-slower).
 
-Under each line/model the query uses two filters (good and fail), not one terms aggregation per defect type. That keeps Elasticsearch under its bucket limit when there are many models. See “Why pad analysis does not explode buckets” below.
+### Pad-failure analysis — `pad-analysis.html`
 
-### 4. Pad-failure analysis (`pad-analysis.html`)
+Opened from a Pareto bar. Jax, filtered to one `spi_pad_result` value. Tables: count by line, and a model × line matrix.
 
-From a Pareto bar. Query is jax filtered to one `spi_pad_result` value. Tables: count by line, and a model × line matrix.
+---
+
+## How KPIs are counted
+
+- Overview and analysis **count documents**. If the same `array_barcode` is inspected three times, that is three board documents.
+- The board **table** still groups by serial so you can open pad details.
+- Counts in the UI use thousands separators (`1,000,000`). Yield is a percentage with two decimals.
+
+Dashboard board pie: Good = `GOOD` + `PASS` + `WARNING`, Fail = `NG`.
 
 ---
 
@@ -217,135 +243,128 @@ Board-level `pcb_result` is different: `GOOD`, `PASS`, `WARNING`, `NG`.
 
 ---
 
-## Why some queries are slower than others
+## Why pad queries are slower
 
 | Query | Index | Typical speed |
 |-------|--------|----------------|
 | Line/model dropdowns | spi-board | Fast |
 | Board overview + board list | spi-board | Fast |
-| Board analysis | spi-board, All time | Moderate (full index, cheap aggs) |
+| Board analysis | spi-board, All time | Moderate |
 | Pad overview + Pareto | jax, All time | Slow — jax is huge |
 | Pad analysis | jax, All time, per line and model | Slowest |
 
 There is no client timeout (`fetchTimeoutMs: 0`) and the proxy waits indefinitely (`ES_TIMEOUT_SEC=0`) so All-time pad aggregations can finish.
 
-Do **not** put `request_cache` in the Elasticsearch JSON body. It is only a URL parameter. Putting it in the body returns **HTTP 400**. Size-0 aggregation searches are cached by Elasticsearch anyway.
+Do **not** put `request_cache` in the Elasticsearch JSON body. That key is only valid as a URL parameter. Putting it in the body returns **HTTP 400**. Size-0 aggregation searches are cached by Elasticsearch anyway.
 
-### Why pad analysis does not explode buckets
+### Elasticsearch bucket limit
 
-Elasticsearch refuses a search that creates more than about **65,536** aggregation buckets.
+A search that creates more than about **65,536** aggregation buckets is rejected.
 
 A naive query “every model × every pad-result type” is:
 
-`models × ~12 pad-result types`
+`number of models × ~12 pad-result types`
 
-With thousands of PCB names that exceeds the cap and the page fails.
+Thousands of PCB names would exceed the cap and the analysis page would fail.
 
-Pad analysis therefore asks, per model/line, only:
+Pad analysis therefore asks, per line/model, only:
 
 - count of good pads
 - count of fail pads
 - parent `doc_count` = all pads
 
-That is two child buckets per model, not twelve.
+That is two child buckets per model, not twelve. Every pad document is still counted.
 
 ---
 
-## The proxy (`proxy.py`)
+## The proxy
 
-`proxy.py` is a stdlib HTTP server. No pip packages.
+`proxy.py` is a Python stdlib HTTP server. No pip packages.
 
 | Method | Path | What it does |
 |--------|------|----------------|
 | GET | `/` and any `.html` / `.js` / `.css` under `web/` | Static files |
-| POST | `/search` | Forwards the JSON body to the **jax** index `_search` |
-| POST | `/search-board` | Forwards the JSON body to the **spi-board** index `_search` |
+| POST | `/search` | Forwards the JSON body to the **jax** `_search` URL |
+| POST | `/search-board` | Forwards the JSON body to the **spi-board** `_search` URL |
 | OPTIONS | `/search` | CORS / health probe |
 
-Defaults (override with environment variables):
+Environment variables (all optional; defaults are in `proxy.py`):
 
-| Variable | Default role |
-|----------|----------------|
-| `PORT` | `8000` |
-| `ES_URL` | Factory SAC Elasticsearch URL |
-| `DETAIL_INDEX` | jax wildcard |
-| `BOARD_INDEX` | spi-board |
-| `ES_USERNAME` / `ES_PASSWORD` | Service user (prefer env vars in production) |
-| `ES_TIMEOUT_SEC` | `0` = wait until ES responds |
+| Variable | Meaning |
+|----------|---------|
+| `PORT` | Listen port (default `8000`) |
+| `ES_URL` | Elasticsearch base URL |
+| `DETAIL_INDEX` | jax / pad index pattern (`POST /search`) |
+| `BOARD_INDEX` | spi-board index (`POST /search-board`) |
+| `ES_USERNAME` / `ES_PASSWORD` | Basic auth (prefer env vars over editing the file) |
+| `ES_TIMEOUT_SEC` | Seconds to wait for ES; `0` = wait until it finishes |
 
-The browser never sends Elasticsearch credentials. `es-client.js` posts to `/search` or `/search-board` on the same origin. `environments.js` sets `proxyUrl: "/search"` for that.
+The browser never sends Elasticsearch credentials. `es-client.js` posts to `/search` or `/search-board` on the same origin. `web/shared/config/environments.js` sets `proxyUrl: "/search"` for that.
 
 ---
 
-## Configuration files
+## Configuration
 
-Startup order on an SPI page (see `web/dashboards/spi/index.html`):
+Script order on an SPI page (`web/dashboards/spi/index.html`):
 
-1. `environments.js` — cluster
-2. `user.js` — which environment
-3. `schema.js` — SPI fields and KPI lists
-4. `settings.js` — time ranges, page size
+1. `../../shared/config/environments.js` — cluster URL
+2. `../../shared/config/user.js` — which environment
+3. `./schema.js` — SPI fields and KPI lists
+4. `../../shared/config/settings.js` — time ranges, page size
 5. Inline `DASHBOARD_PAGE` + `schema: "SPI"`
-6. `bootstrap.js` — builds `Dashboard.config`
-7. Shared JS (`registry`, `shell`, queries, client, UI, app)
+6. `../../shared/config/bootstrap.js` — builds `Dashboard.config`
+7. Shared JS: `registry`, `shell`, `config-access`, `es-queries`, `es-client`, `ui`, `app`
 
 | File | Purpose |
 |------|---------|
-| `web/shared/config/user.js` | `environment: "factory-sac"`. Optional `overrides.defaultTimeRange` / `pageSize`. |
+| `web/shared/config/user.js` | `environment: "factory-sac"`. Optional `overrides` for time range / page size. |
 | `web/shared/config/environments.js` | `node`, `proxyUrl`. Keep `node` in sync with `ES_URL` in `proxy.py`. |
-| `web/shared/config/settings.js` | `defaultTimeRange`, `timeLabels`, `pageSize` (25), `refreshMs` (120s), `fetchTimeoutMs` (`0` = no abort). |
-| `web/dashboards/spi/schema.js` | SPI field names, good/fail values, column lists, `indexMode: "dual"`. |
-| `web/dashboards/magicray/schema.js` | MagicRay field names, `indexMode: "single"`. Mapping was never confirmed from a real index dump. |
+| `web/shared/config/settings.js` | `defaultTimeRange` (`all`), labels, `pageSize` (25), `refreshMs` (120s), `fetchTimeoutMs` (`0` = no abort). |
+| `web/dashboards/spi/schema.js` | SPI field names, good/fail values, columns, `indexMode: "dual"`. |
+| `web/dashboards/magicray/schema.js` | MagicRay field names, `indexMode: "single"`. Mapping not confirmed from a real dump. |
 | `proxy.py` | Port, ES URL, both index names, credentials, timeout. |
 
-To default the time dropdown back to 14 days, set `defaultTimeRange: "14d"` in `settings.js` (or `user.js` overrides). `"all"` must stay in `timeOrder` to keep the All time option.
+To default the time dropdown to 14 days, set `defaultTimeRange: "14d"` in `settings.js` (or in `user.js` overrides). Keep `"all"` in `timeOrder` so All time stays in the list.
 
 ---
 
-## Shared JavaScript (what each file does)
+## Shared JavaScript
+
+All under `web/shared/js/`.
 
 | File | Role |
 |------|------|
 | `registry.js` | Hub cards and the Home / SPI / MagicRay tabs |
 | `shell.js` | Renders those tabs; sets the page title from the schema |
 | `config-access.js` | `getFields()`, `esField()`, `esBoardField()`, `normalizeResult()`, `countNormalizedResults()` |
-| `es-queries.js` | Filters and aggregations. `isAllTime()` skips the date range. `lite: true` skips empty-serial / underscore-file filters on KPI queries. |
-| `es-client.js` | `search()` → `/search` (jax). `searchBoard()` → `/search-board`. Surfaces Elasticsearch error reasons on HTTP failures. |
-| `ui.js` | Overview cards, tables, Pareto SVG, number formatting (`1,000,000`) |
-| `app.js` | Filter changes, progressive KPI load, board/pad paging, Excel export |
+| `es-queries.js` | Filters and aggregations. `isAllTime()` skips the date range. KPI queries use `lite: true` so they skip extra empty-serial filters. |
+| `es-client.js` | `search()` → `/search` (jax). `searchBoard()` → `/search-board`. Shows Elasticsearch’s error text on HTTP failures. |
+| `ui.js` | Overview cards, tables, Pareto chart, number formatting |
+| `app.js` | Filter changes, progressive KPI load, paging, Excel export |
 
 MagicRay uses the same `app.js` with `indexMode: "single"`, so both KPI cards hit `/search` only.
 
 ---
 
-## MagicRay status
+## MagicRay
 
-The MagicRay folder is isolated so SPI changes do not overwrite it. Its schema is **assumed** (`inspectiondate`, `confirmedresult`, station `FQI_AUTOTEST`). Until a real mapping and sample documents are provided, KPI numbers may be wrong. It still uses the jax `/search` proxy unless `proxy.py` is pointed at a MagicRay index.
+`web/dashboards/magicray/` is isolated so SPI changes do not overwrite it.
+
+Its schema is **assumed** (`inspectiondate`, `confirmedresult`, station `FQI_AUTOTEST`). Until a real mapping and sample documents are provided, KPI numbers may be wrong. It currently uses the same jax `POST /search` proxy unless `DETAIL_INDEX` in `proxy.py` is pointed at a MagicRay index.
 
 ---
 
-## Adding a new dashboard (AOI, etc.)
+## Adding a dashboard
 
 Short checklist: [ADDING-A-DASHBOARD.md](ADDING-A-DASHBOARD.md).
 
-Idea: one folder per data source, shared core stays generic.
-
 1. Add `web/dashboards/<id>/index.html` and `schema.js`.
-2. Register the card in `web/shared/js/registry.js` (`path` must be `/dashboards/<id>/index.html`).
+2. Register the card in `web/shared/js/registry.js`. `path` must be `/dashboards/<id>/index.html`.
 3. Set `indexMode` to `"dual"` if you have a header index plus a detail index, or `"single"` if one index holds everything.
-4. Map `fields` / `boardFields` and `kpi.good` / `kpi.fail` from a real Elasticsearch mapping, not from names that “look right”.
+4. Map `fields` / `boardFields` and `kpi.good` / `kpi.fail` from a real Elasticsearch mapping.
 5. If you need a second index, add another POST route in `proxy.py` (the way `/search-board` was added for SPI).
 
-No proxy change is required for new **static** files under `web/dashboards/`.
-
----
-
-## Numbers and counting rules (SPI)
-
-- Overview and analysis **count documents**. Repeated `array_barcode` / `spi_array_barcode` values each count.
-- The board **table** still groups by serial so you can open pads for that board.
-- Counts in the UI use thousands separators (`1,000,000`). Yield is a percentage with two decimals.
-- Analysis model lists request up to 10,000 distinct models so normal SMT model lists are not truncated.
+New static files under `web/dashboards/` need no proxy change.
 
 ---
 
@@ -354,13 +373,13 @@ No proxy change is required for new **static** files under `web/dashboards/`.
 | Symptom | Likely cause | What to do |
 |---------|--------------|------------|
 | Page looks like the old version | Old `proxy.py` still running | Kill it, start again, `Ctrl+F5` |
-| `404` on `/dashboards/spi/index.html` | Old proxy still serving `SPI/` or the repo root | Kill it, run `python proxy.py` from the repo root (it must print `web` as the static root) |
-| Browser **downloads** a file named `spi` | Hit `/spi` without redirect / MIME | Use `/dashboards/spi/index.html` or pull a version that 302s `/spi` |
-| `HTTP 400` | Invalid search body (for example `request_cache` inside JSON) | Check the error text on the red banner; that key must not be in the body |
+| `404` on `/dashboards/spi/index.html` | Old proxy serving `SPI/` or the repo root | Kill it. New startup log must include `...\web` |
+| Browser **downloads** a file named `spi` | Hit `/spi` on a proxy that does not 302 | Use `/dashboards/spi/index.html`, or pull this version |
+| `HTTP 400` | Invalid search body (for example `request_cache` in JSON) | Read the red banner; that key must not be in the body |
 | `502` / cannot reach Elasticsearch | No VPN, or `ES_URL` wrong | Connect VPN; check `proxy.py` |
-| Board KPIs show, pad KPIs stay on “Loading…” | jax All-time aggregation still running | Wait; there is no timeout. Board data is already correct. |
-| Pad analysis errors after adding many models | Too many aggregation buckets | Keep good/fail as two filters per model (current code) |
-| Line/model dropdown empty | Query hit jax with `.keyword` on a keyword-only board field, or wrong station filter | Dropdowns must use `/search-board` and `esBoardField()` |
+| Board KPIs show, pad KPIs stay on “Loading…” | jax All-time aggregation still running | Wait; there is no timeout. Board data is already correct |
+| Pad analysis errors with many models | Too many aggregation buckets | Keep good/fail as two filters per model (current code) |
+| Line/model dropdown empty | Query hit jax with `.keyword` on a board keyword field | Dropdowns must use `/search-board` and `esBoardField()` |
 
 ---
 
