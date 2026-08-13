@@ -30,8 +30,6 @@
     stationValue: schema.stationValue || schema.station || "SPI",
 
     pageSize: overrides.pageSize ?? settings.pageSize ?? 25,
-    compositePageSize: settings.compositePageSize ?? 5000,
-    boardCacheMs: settings.boardCacheMs ?? 180_000,
     refreshMs: settings.refreshMs ?? 120_000,
     healthMs: settings.healthMs ?? 60_000,
     fetchTimeoutMs: settings.fetchTimeoutMs ?? 35_000,

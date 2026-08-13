@@ -492,55 +492,36 @@
     },
 
     applyPadKpis(padAggRes) {
-      const padAggs = padAggRes.aggregations ?? {};
-      const kpi = D.getKpi();
-      const goodValues = new Set((kpi.good || ["GOOD"]).map((v) => String(v).toUpperCase()));
-      const failValues = new Set((kpi.fail || []).map((v) => String(v).toUpperCase()));
-
-      let good = padAggs.count_good?.doc_count ?? 0;
-      let pass = padAggs.count_pass?.doc_count ?? 0;
-      let fail = padAggs.count_fail?.doc_count ?? 0;
-      let padFailureCounts =
-        padAggs.pad_failure_types?.types?.buckets?.reduce((acc, bucket) => {
-          acc[bucket.key] = bucket.doc_count;
-          return acc;
-        }, {}) || {};
-
-      const termBuckets = padAggs.pad_results?.buckets;
-      if (termBuckets) {
-        good = 0;
-        pass = 0;
-        fail = 0;
-        padFailureCounts = {};
-        for (const bucket of termBuckets) {
-          const key = String(bucket.key);
-          const upper = key.toUpperCase();
-          const count = bucket.doc_count || 0;
-          if (goodValues.has(upper)) {
-            good += count;
-          } else if (failValues.has(upper)) {
-            fail += count;
-            padFailureCounts[key] = count;
-          } else {
-            pass += count;
-          }
+      const buckets = padAggRes.aggregations?.pad_results?.buckets || [];
+      const counts = D.countNormalizedResults(
+        buckets,
+        (bucket) => bucket.doc_count || 0
+      );
+      const failValues = new Set(
+        (D.getKpi().fail || []).map((value) => String(value).toUpperCase())
+      );
+      const padFailureCounts = {};
+      for (const bucket of buckets) {
+        const key = String(bucket.key);
+        if (failValues.has(key.toUpperCase())) {
+          padFailureCounts[key] = bucket.doc_count || 0;
         }
       }
 
-      const padTotal = good + pass + fail;
-      const padYield = padTotal > 0 ? (good / padTotal) * 100 : 0;
+      const padTotal = counts.good + counts.pass + counts.fail;
+      const padYield = padTotal > 0 ? (counts.good / padTotal) * 100 : 0;
       this._padTotal = padTotal;
 
       const padCard = $("pad-overview-content");
       if (padCard) {
         padCard.innerHTML = buildOverviewCard({
-          goodCount: good,
+          goodCount: counts.good,
           passCount: 0,
-          failCount: fail,
+          failCount: counts.fail,
           stats: [
             { label: D.getLabel("padTotal", "Total"), value: padTotal },
-            { label: "Good", value: good },
-            { label: "Fail", value: fail },
+            { label: "Good", value: counts.good },
+            { label: "Fail", value: counts.fail },
             { label: "Yield", value: `${padYield.toFixed(2)}%` },
           ],
         });

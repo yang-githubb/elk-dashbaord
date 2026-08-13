@@ -3,12 +3,17 @@ Dashboard static file server + Elasticsearch proxy.
 
 Stdlib only — no pip packages required. Run: python proxy.py
 
+Always stop the old process and start a new one after git pull.
+The previous python process keeps serving old files and old proxy routes.
+
 Environment variables:
-  PORT        — listen port (default 8000)
-  ES_URL      — Elasticsearch base URL
-  ES_INDEX    — index pattern
-  ES_USERNAME — basic auth user
-  ES_PASSWORD — basic auth password
+  PORT            — listen port (default 8000)
+  ES_URL          — Elasticsearch base URL
+  DETAIL_INDEX    — jax / pad index pattern (POST /search)
+  BOARD_INDEX     — spi-board index (POST /search-board)
+  ES_USERNAME     — basic auth user
+  ES_PASSWORD     — basic auth password
+  ES_TIMEOUT_SEC  — ES HTTP timeout in seconds; 0 means wait until ES finishes
 """
 
 import base64

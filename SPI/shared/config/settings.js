@@ -3,8 +3,6 @@
  */
 window.DASHBOARD_SETTINGS = {
   pageSize: 25,
-  compositePageSize: 5000,
-  boardCacheMs: 180_000,
   refreshMs: 120_000,
   healthMs: 60_000,
   fetchTimeoutMs: 0,

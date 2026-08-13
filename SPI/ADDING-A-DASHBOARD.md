@@ -1,6 +1,8 @@
 # Adding a new dashboard
 
-Each data source gets its own folder under `SPI/dashboards/<id>/`.
+Full architecture, SPI indices, and KPI rules: [README.md](../README.md).
+
+Each data source gets its own folder under `SPI/dashboards/<id>/`. Do not copy SPI query code into the new folder unless that source really uses the same indices.
 
 ## 1. Register the dashboard
 
@@ -12,7 +14,7 @@ Add an entry to `SPI/shared/js/registry.js`:
   schemaKey: "AOI",
   label: "AOI Dashboard",
   description: "Automated optical inspection KPIs.",
-  path: "dashboards/aoi/index.html",
+  path: "/dashboards/aoi/index.html",
   station: "AOI",
 }
 ```

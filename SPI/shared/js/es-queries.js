@@ -19,10 +19,6 @@
 
     // ---- Field helpers -------------------------------------------------
 
-    boardSourceFileField() {
-      return D.getKpi().boardSourceFileField || "source_file";
-    },
-
     padNoField() {
       return D.getKpi().boardCountField || "spi_pad_no";
     },

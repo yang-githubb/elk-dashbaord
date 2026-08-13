@@ -97,7 +97,6 @@ window.DASHBOARD_SCHEMAS.SPI = {
     boardGood: ["GOOD"],
     boardPass: ["PASS", "WARNING"],
     boardFail: ["NG"],
-    boardFailField: "pcb_result",
 
     serialField: "spi_array_barcode.keyword",
     boardSerialField: "array_barcode",
@@ -107,7 +106,6 @@ window.DASHBOARD_SCHEMAS.SPI = {
     excludeEmptySerial: true,
     excludeLeadingUnderscoreSource: true,
     boardCountField: "spi_pad_no",
-    boardSourceFileField: "source_file",
   },
 
   detailSort: [
