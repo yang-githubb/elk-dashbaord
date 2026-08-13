@@ -44,7 +44,11 @@
 
   async function postSearch(url, body, signal) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), cfg().fetchTimeoutMs);
+    const timeoutMs = Number(cfg().fetchTimeoutMs) || 0;
+    const timeout =
+      timeoutMs > 0
+        ? setTimeout(() => controller.abort(), timeoutMs)
+        : null;
     const onAbort = () => controller.abort();
     signal?.addEventListener("abort", onAbort);
 
@@ -67,7 +71,7 @@
       }
       return JSON.parse(text);
     } finally {
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
       signal?.removeEventListener("abort", onAbort);
     }
   }

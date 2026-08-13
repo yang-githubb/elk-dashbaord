@@ -8,7 +8,7 @@
 
   const params = new URLSearchParams(window.location.search);
   const filterState = {
-    time: params.get("time") || "all",
+    time: params.get("time") || Dashboard.config?.defaultTimeRange || "all",
     line: params.get("line") || "",
     model: params.get("model") || "",
     failure: params.get("failure") || "",

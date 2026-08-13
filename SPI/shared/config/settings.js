@@ -7,8 +7,8 @@ window.DASHBOARD_SETTINGS = {
   boardCacheMs: 180_000,
   refreshMs: 120_000,
   healthMs: 60_000,
-  fetchTimeoutMs: 300_000,
-  defaultTimeRange: "14d",
+  fetchTimeoutMs: 0,
+  defaultTimeRange: "all",
 
   timeLabels: {
     "15m": "Last 15 minutes",
@@ -18,9 +18,10 @@ window.DASHBOARD_SETTINGS = {
     "7d": "Last 7 days",
     "14d": "Last 14 days",
     "28d": "Last 28 days",
+    all: "All time",
   },
 
-  timeOrder: ["15m", "1h", "6h", "24h", "7d", "14d", "28d"],
+  timeOrder: ["15m", "1h", "6h", "24h", "7d", "14d", "28d", "all"],
 
   esTimeRanges: {
     "15m": "now-15m",

@@ -11,7 +11,7 @@
   const params = new URLSearchParams(window.location.search);
   const isPadView = params.get("view") === "pad";
   const filterState = {
-    time: params.get("time") || "all",
+    time: params.get("time") || Dashboard.config?.defaultTimeRange || "all",
     line: params.get("line") || "",
     model: params.get("model") || "",
   };

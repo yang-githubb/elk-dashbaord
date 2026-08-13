@@ -27,6 +27,7 @@
     padTotalPages: 1,
     boardAfterStack: [null],
     loading: false,
+    inFlight: false,
     abort: null,
     padSearch: "",
     boardSearch: "",
@@ -78,32 +79,6 @@
   // ---- Data loading ----------------------------------------------------
 
   async function loadFilters() {
-    const fields = D.getFields();
-    const filters = [];
-
-    esQueries.pushTimeFilter(filters, fields.time);
-    esQueries.pushTerm(
-      filters,
-      D.esField(fields.station),
-      D.config.stationValue || "SPI"
-    );
-
-    const lineField = D.esField(fields.line);
-    const modelField = D.esField(fields.model);
-
-    const res = await esClient.search({
-      size: 0,
-      query: esQueries.buildEsQuery(filters),
-      aggs: {
-        lines: lineField
-          ? { terms: { field: lineField, size: 200, order: { _key: "asc" } } }
-          : { terms: { field: "_id", size: 0 } },
-        models: modelField
-          ? { terms: { field: modelField, size: 200, order: { _key: "asc" } } }
-          : { terms: { field: "_id", size: 0 } },
-      },
-    });
-
     const timeSelect = ui.$("time");
     ui.fillSelect(
       timeSelect,
@@ -114,6 +89,48 @@
       (option) => option.label
     );
     if (timeSelect) timeSelect.value = D.state.time;
+
+    const dual = D.getIndexMode() === "dual";
+    const fields = dual ? D.getBoardFields() : D.getFields();
+    const filters = [];
+
+    if (dual) {
+      esQueries.pushTimeFilter(filters, fields.time);
+      esQueries.pushTerm(
+        filters,
+        D.esBoardField(fields.station) || "station",
+        D.config.stationValue || "SPI"
+      );
+    } else {
+      esQueries.pushTimeFilter(filters, fields.time);
+      esQueries.pushTerm(
+        filters,
+        D.esField(fields.station),
+        D.config.stationValue || "SPI"
+      );
+    }
+
+    const lineField = dual
+      ? D.esBoardField(fields.line)
+      : D.esField(fields.line);
+    const modelField = dual
+      ? D.esBoardField(fields.model)
+      : D.esField(fields.model);
+
+    const searchFn = dual ? esClient.searchBoard : esClient.search;
+    const res = await searchFn({
+      size: 0,
+      track_total_hits: false,
+      query: esQueries.buildEsQuery(filters),
+      aggs: {
+        lines: lineField
+          ? { terms: { field: lineField, size: 200, order: { _key: "asc" } } }
+          : { terms: { field: "_id", size: 0 } },
+        models: modelField
+          ? { terms: { field: modelField, size: 200, order: { _key: "asc" } } }
+          : { terms: { field: "_id", size: 0 } },
+      },
+    });
 
     const lines = res.aggregations?.lines?.buckets?.map((b) => String(b.key)) ?? [];
     const models = res.aggregations?.models?.buckets?.map((b) => String(b.key)) ?? [];
@@ -128,41 +145,34 @@
     ]);
   }
 
-  async function loadKpis(signal) {
-    if (D.getIndexMode() === "dual") {
-      const [boardAggRes, padAggRes] = await Promise.all([
-        esClient.searchBoard(
-          {
-            size: 0,
-            query: esQueries.buildEsQuery(esQueries.buildBoardFilters()),
-            aggs: esQueries.buildBoardDashboardAggs(),
-          },
-          signal
-        ),
-        esClient.search(
-          {
-            size: 0,
-            query: esQueries.buildEsQuery(esQueries.buildEsFilters()),
-            aggs: esQueries.buildPadDashboardAggs(),
-          },
-          signal
-        ),
-      ]);
-      return { boardAggRes, padAggRes };
-    }
+  function kpiSearchBody(query, aggs) {
+    return {
+      size: 0,
+      track_total_hits: false,
+      request_cache: true,
+      query,
+      aggs,
+    };
+  }
 
-    const res = await esClient.search(
-      {
-        size: 0,
-        query: esQueries.buildEsQuery(esQueries.buildEsFilters()),
-        aggs: {
-          ...esQueries.buildBoardDashboardAggs(),
-          ...esQueries.buildPadDashboardAggs(),
-        },
-      },
+  async function loadBoardKpis(signal) {
+    return esClient.searchBoard(
+      kpiSearchBody(
+        esQueries.buildEsQuery(esQueries.buildBoardFilters()),
+        esQueries.buildBoardDashboardAggs()
+      ),
       signal
     );
-    return { boardAggRes: res, padAggRes: res };
+  }
+
+  async function loadPadKpis(signal) {
+    return esClient.search(
+      kpiSearchBody(
+        esQueries.buildEsQuery(esQueries.buildEsFilters({ skipSerialSearch: true })),
+        esQueries.buildPadDashboardAggs()
+      ),
+      signal
+    );
   }
 
   async function loadBoardList(signal) {
@@ -229,6 +239,8 @@
   }
 
   async function loadDashboard(silent = false) {
+    if (silent && D.state.inFlight) return;
+
     if (!silent) ui.setLoading(true);
     ui.hideError();
 
@@ -241,34 +253,76 @@
     D.state.abort?.abort();
     const controller = new AbortController();
     D.state.abort = controller;
+    D.state.inFlight = true;
 
     try {
-      const { boardAggRes, padAggRes } = await loadKpis(controller.signal);
-      if (controller.signal.aborted) return;
-
-      ui.applyKpis(boardAggRes, padAggRes);
-
       const showingPads =
         D.isPadLevel() &&
         D.state.view === "pads" &&
         D.state.selectedSerial;
 
-      if (showingPads) {
-        await loadPads(D.state.padPage, controller.signal);
-      } else if (D.hasFeature("boardList")) {
-        await loadBoardList(controller.signal);
-      }
+      if (D.getIndexMode() === "dual") {
+        const padKpiPromise = loadPadKpis(controller.signal);
+        const boardAggRes = await loadBoardKpis(controller.signal);
+        if (controller.signal.aborted) return;
 
-      ui.setStatus(true);
+        ui.applyBoardKpis(boardAggRes);
+        if (!silent) ui.setPadKpisLoading();
+
+        if (showingPads) {
+          await loadPads(D.state.padPage, controller.signal);
+        } else if (D.hasFeature("boardList")) {
+          await loadBoardList(controller.signal);
+        }
+
+        ui.setStatus(true);
+        ui.setLoading(false);
+
+        try {
+          const padAggRes = await padKpiPromise;
+          if (controller.signal.aborted) return;
+          ui.applyPadKpis(padAggRes);
+        } catch (padErr) {
+          if (!controller.signal.aborted) {
+            ui.applyPadKpisError(padErr?.message || "Pad KPI query timed out");
+          }
+        }
+      } else {
+        const res = await esClient.search(
+          kpiSearchBody(
+            esQueries.buildEsQuery(esQueries.buildEsFilters({ skipSerialSearch: true })),
+            {
+              ...esQueries.buildBoardDashboardAggs(),
+              ...esQueries.buildPadDashboardAggs(),
+            }
+          ),
+          controller.signal
+        );
+        if (controller.signal.aborted) return;
+
+        ui.applyBoardKpis(res);
+        ui.applyPadKpis(res);
+
+        if (showingPads) {
+          await loadPads(D.state.padPage, controller.signal);
+        } else if (D.hasFeature("boardList")) {
+          await loadBoardList(controller.signal);
+        }
+
+        ui.setStatus(true);
+      }
     } catch (err) {
       if (controller.signal.aborted) return;
       ui.setStatus(false);
       ui.showError(err?.message || "Failed to load data");
     } finally {
-      if (!controller.signal.aborted) {
-        ui.setLoading(false);
-        ui.updateBoardPager();
-        ui.updatePadPager();
+      if (D.state.abort === controller) {
+        D.state.inFlight = false;
+        if (!controller.signal.aborted) {
+          ui.setLoading(false);
+          ui.updateBoardPager();
+          ui.updatePadPager();
+        }
       }
     }
   }

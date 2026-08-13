@@ -51,7 +51,8 @@ ES_USERNAME = os.environ.get(
 )
 
 ES_PASSWORD = os.environ.get("ES_PASSWORD", "7Efuei>L")
-ES_TIMEOUT_SEC = int(os.environ.get("ES_TIMEOUT_SEC", "300"))
+# 0 = wait indefinitely for large pad aggregations
+ES_TIMEOUT_SEC = int(os.environ.get("ES_TIMEOUT_SEC", "0"))
 
 STATIC_SUFFIXES = frozenset({".html", ".js", ".css", ".ico", ".svg", ".png", ".map"})
 CHUNK_SIZE = 65536  # 64KB chunks for writing large responses
@@ -122,8 +123,8 @@ def es_request(url: str, body: bytes) -> tuple[int, bytes]:
     )
     ctx = ssl.create_default_context()
     try:
-        # Increased timeout for large aggregations and heavy queries.
-        with urlopen(req, timeout=ES_TIMEOUT_SEC, context=ctx) as res:
+        es_timeout = None if ES_TIMEOUT_SEC <= 0 else ES_TIMEOUT_SEC
+        with urlopen(req, timeout=es_timeout, context=ctx) as res:
             return res.status, res.read()
     except HTTPError as err:
         return err.code, err.read()

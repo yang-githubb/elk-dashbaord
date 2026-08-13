@@ -73,11 +73,18 @@
         D.config.stationValue
       );
 
+      const serialField = D.esBoardField(fields.serial) || "array_barcode";
+      if (D.state.boardSearch?.trim() && serialField) {
+        filters.push({
+          prefix: { [serialField]: D.state.boardSearch.trim() },
+        });
+      }
+
       return filters;
     },
 
     /** Filters for the detail / pad index (jax optimizations). */
-    buildEsFilters() {
+    buildEsFilters(options = {}) {
       const fields = D.getFields();
       const kpi = D.getKpi();
       const filters = [];
@@ -88,7 +95,7 @@
       this.pushTerm(filters, D.esField(fields.station), D.config.stationValue);
 
       const serialField = D.esField(fields.serial);
-      if (D.state.boardSearch?.trim() && serialField) {
+      if (!options.skipSerialSearch && D.state.boardSearch?.trim() && serialField) {
         filters.push({
           prefix: { [serialField]: D.state.boardSearch.trim() },
         });
@@ -154,27 +161,13 @@
     },
 
     buildPadDashboardAggs() {
-      const kpi = D.getKpi();
-      const resultField = this.padResultField();
-      const failValues = this.padFailValues();
-
       return {
-        total_count: { value_count: { field: resultField } },
-        count_good: {
-          filter: this.buildTermsFilter(resultField, kpi.good || ["GOOD"]),
-        },
-        count_pass: {
-          filter: this.buildTermsFilter(resultField, kpi.pass || []),
-        },
-        count_fail: {
-          filter: this.buildTermsFilter(resultField, failValues),
-        },
-        pad_failure_types: {
-          filter: this.buildTermsFilter(resultField, failValues),
-          aggs: {
-            types: {
-              terms: { field: resultField, size: 25, order: { _count: "desc" } },
-            },
+        pad_results: {
+          terms: {
+            field: this.padResultField(),
+            size: 40,
+            // Few pad-result values; map avoids building global ordinals.
+            execution_hint: "map",
           },
         },
       };

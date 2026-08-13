@@ -421,33 +421,18 @@
       });
     },
 
-    applyKpis(boardAggRes, padAggRes) {
+    applyBoardKpis(boardAggRes) {
       const boardAggs = boardAggRes.aggregations ?? {};
-      const padAggs = padAggRes.aggregations ?? {};
-
-      const good = padAggs.count_good?.doc_count ?? 0;
-      const pass = padAggs.count_pass?.doc_count ?? 0;
-      const fail = padAggs.count_fail?.doc_count ?? 0;
-      const padTotal = good + pass + fail;
-      const padYield = padTotal > 0 ? (good / padTotal) * 100 : 0;
-
-      const padFailureCounts = (
-        padAggs.pad_failure_types?.types?.buckets || []
-      ).reduce((acc, bucket) => {
-        acc[bucket.key] = bucket.doc_count;
-        return acc;
-      }, {});
-
       const boardCounts = D.countNormalizedResults(
         boardAggs.board_results?.buckets || [],
         (bucket) => bucket.doc_count ?? 0
       );
 
-      // Overview card shows Good vs Fail only (PASS/WARNING counted as Good).
       const boardGood = boardCounts.good + boardCounts.pass;
       const boardFail = boardCounts.fail;
       const boardCount = boardGood + boardFail;
       const boardYield = boardCount > 0 ? (boardGood / boardCount) * 100 : 0;
+      this._boardCount = boardCount;
 
       const boardCard = $("board-overview-content");
       if (boardCard) {
@@ -464,6 +449,88 @@
         });
       }
 
+      const boardOverview = $("board-overview-card");
+      if (boardOverview) {
+        const canOpen = D.hasFeature("boardAnalysis");
+        boardOverview.classList.toggle("overview-card-clickable", canOpen);
+        boardOverview.onclick = canOpen
+          ? () => {
+              const query = new URLSearchParams({
+                time: D.state.time,
+                line: D.state.line,
+                model: D.state.model,
+              });
+              window.location.href = `${D.pageUrl("analysis")}?${query.toString()}`;
+            }
+          : null;
+      }
+
+      this.updateModeLabel(this._padTotal || 0, boardCount);
+      this.setText("updated", `Updated ${formatTime(new Date())}`);
+    },
+
+    setPadKpisLoading() {
+      const padCard = $("pad-overview-content");
+      if (padCard) {
+        padCard.innerHTML = '<p class="empty-note">Loading pad KPIs…</p>';
+      }
+      const chart = $("pareto-chart");
+      if (chart) {
+        chart.innerHTML = '<div class="pareto-empty"><p class="empty-note">Loading pad failures…</p></div>';
+      }
+    },
+
+    applyPadKpisError(message) {
+      const padCard = $("pad-overview-content");
+      if (padCard) {
+        padCard.innerHTML = `<p class="empty-note">${message}</p>`;
+      }
+      const chart = $("pareto-chart");
+      if (chart) {
+        chart.innerHTML = `<div class="pareto-empty"><p class="empty-note">${message}</p></div>`;
+      }
+    },
+
+    applyPadKpis(padAggRes) {
+      const padAggs = padAggRes.aggregations ?? {};
+      const kpi = D.getKpi();
+      const goodValues = new Set((kpi.good || ["GOOD"]).map((v) => String(v).toUpperCase()));
+      const failValues = new Set((kpi.fail || []).map((v) => String(v).toUpperCase()));
+
+      let good = padAggs.count_good?.doc_count ?? 0;
+      let pass = padAggs.count_pass?.doc_count ?? 0;
+      let fail = padAggs.count_fail?.doc_count ?? 0;
+      let padFailureCounts =
+        padAggs.pad_failure_types?.types?.buckets?.reduce((acc, bucket) => {
+          acc[bucket.key] = bucket.doc_count;
+          return acc;
+        }, {}) || {};
+
+      const termBuckets = padAggs.pad_results?.buckets;
+      if (termBuckets) {
+        good = 0;
+        pass = 0;
+        fail = 0;
+        padFailureCounts = {};
+        for (const bucket of termBuckets) {
+          const key = String(bucket.key);
+          const upper = key.toUpperCase();
+          const count = bucket.doc_count || 0;
+          if (goodValues.has(upper)) {
+            good += count;
+          } else if (failValues.has(upper)) {
+            fail += count;
+            padFailureCounts[key] = count;
+          } else {
+            pass += count;
+          }
+        }
+      }
+
+      const padTotal = good + pass + fail;
+      const padYield = padTotal > 0 ? (good / padTotal) * 100 : 0;
+      this._padTotal = padTotal;
+
       const padCard = $("pad-overview-content");
       if (padCard) {
         padCard.innerHTML = buildOverviewCard({
@@ -479,27 +546,11 @@
         });
       }
 
-      const boardOverview = $("board-overview-card");
-      if (boardOverview) {
-        const canOpenBoardAnalysis = D.hasFeature("boardAnalysis");
-        boardOverview.classList.toggle("overview-card-clickable", canOpenBoardAnalysis);
-        boardOverview.onclick = canOpenBoardAnalysis
-          ? () => {
-              const query = new URLSearchParams({
-                time: D.state.time,
-                line: D.state.line,
-                model: D.state.model,
-              });
-              window.location.href = `${D.pageUrl("analysis")}?${query.toString()}`;
-            }
-          : null;
-      }
-
       const padOverview = $("pad-overview-card");
       if (padOverview) {
-        const canOpenPadAnalysis = D.hasFeature("padAnalysis");
-        padOverview.classList.toggle("overview-card-clickable", canOpenPadAnalysis);
-        padOverview.onclick = canOpenPadAnalysis
+        const canOpen = D.hasFeature("padAnalysis");
+        padOverview.classList.toggle("overview-card-clickable", canOpen);
+        padOverview.onclick = canOpen
           ? () => {
               const query = new URLSearchParams({
                 time: D.state.time,
@@ -512,7 +563,7 @@
           : null;
       }
 
-      this.updateModeLabel(padTotal, boardCount);
+      this.updateModeLabel(padTotal, this._boardCount || 0);
       this.setText("updated", `Updated ${formatTime(new Date())}`);
       this.updateParetoChart(padFailureCounts);
     },
