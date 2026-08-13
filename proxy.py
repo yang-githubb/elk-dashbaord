@@ -36,9 +36,15 @@ ES_URL = os.environ.get(
     "ES_URL", "https://elastic-sac-platinum.elkaas.flex.com"
 ).rstrip("/")
 
-ES_INDEX = os.environ.get(
-    "ES_INDEX", "flexh1smtmachinesdata00589-jax_process_optimizations*"
+DETAIL_INDEX = os.environ.get(
+    "DETAIL_INDEX", "flexh1smtmachinesdata00589-jax_process_optimizations*"
 )
+
+BOARD_INDEX = os.environ.get("BOARD_INDEX", "flexh1smtmachinesdata00589-spi-board")
+
+DETAIL_SEARCH_URL = f"{ES_URL}/{DETAIL_INDEX}/_search"
+
+BOARD_SEARCH_URL = f"{ES_URL}/{BOARD_INDEX}/_search"
 
 ES_USERNAME = os.environ.get(
     "ES_USERNAME", "flexh1smtmachinesdata00589-sac-pl-00601-service-user"
@@ -46,7 +52,6 @@ ES_USERNAME = os.environ.get(
 
 ES_PASSWORD = os.environ.get("ES_PASSWORD", "7Efuei>L")
 ES_TIMEOUT_SEC = int(os.environ.get("ES_TIMEOUT_SEC", "300"))
-SEARCH_URL = f"{ES_URL}/{ES_INDEX}/_search"
 
 # Only these paths may be served over HTTP (prevents path traversal)
 ALLOWED_STATIC = frozenset(
@@ -70,10 +75,10 @@ def is_allowed_static(path: str) -> bool:
     return path.endswith(".js") and path.startswith(ALLOWED_PREFIXES)
 
 
-def es_request(body: bytes) -> tuple[int, bytes]:
+def es_request(url: str, body: bytes) -> tuple[int, bytes]:
     creds = base64.b64encode(f"{ES_USERNAME}:{ES_PASSWORD}".encode()).decode()
     req = Request(
-        SEARCH_URL,
+        url,
         data=body,
         method="POST",
         headers={
@@ -132,22 +137,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
-        if path not in ("/search", "/search/"):
-            self.send_error(404, "Use POST /search")
-            return
+        if path in ("/search", "/search/"):
+            target_url = DETAIL_SEARCH_URL
 
+        elif path in ("/search-board", "/search-board/"):
+            target_url = BOARD_SEARCH_URL
+
+        else:
+            self.send_error(404, "Use POST /search or /search-board")
+            return
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length) if length else b"{}"
 
         try:
-            status, data = es_request(body)
+            status, data = es_request(target_url, body)
         except URLError as err:
             reason = err.reason if hasattr(err, "reason") else str(err)
             msg = json.dumps(
                 {
                     "error": f"Cannot reach Elasticsearch: {reason}",
                     "hint": "Check VPN/network and ES_URL in proxy.py",
-                    "target": SEARCH_URL,
+                    "target": target_url,
                 }
             ).encode()
             print(f"[proxy] ES connection failed: {reason}")
@@ -164,7 +174,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 {
                     "error": f"Elasticsearch proxy error: {reason}",
                     "hint": "Check proxy.py and Elasticsearch availability",
-                    "target": SEARCH_URL,
+                    "target": target_url,
                 }
             ).encode()
             print(f"[proxy] Unexpected proxy error: {reason}")
@@ -212,5 +222,6 @@ if __name__ == "__main__":
     server = ThreadingHTTPServer(("0.0.0.0", PORT), DashboardHandler)
     print(f"Dashboard:  http://0.0.0.0:{PORT}/")
     print(f"ELK proxy:  http://0.0.0.0:{PORT}/search")
-    print(f"Elasticsearch: {SEARCH_URL}")
+    print(f"Board Index : {BOARD_SEARCH_URL}")
+    print(f"Detail Index: {DETAIL_SEARCH_URL}")
     server.serve_forever()

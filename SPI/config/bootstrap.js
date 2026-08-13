@@ -54,6 +54,9 @@
     kpiDetailLabel: schema.kpiDetailLabel || "Pad",
     detailSort: schema.detailSort || null,
     fields: { ...schema.fields, ...(overrides.fields || {}) },
+    boardFields: {
+      ...(schema.boardFields || {})
+    },
     resultMap: schema.resultMap || {},
     kpi: schema.kpi || {},
     boardColumns: schema.boardColumns || [],

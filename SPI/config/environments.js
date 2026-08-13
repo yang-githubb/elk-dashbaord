@@ -8,7 +8,7 @@ window.DASHBOARD_ENVIRONMENTS = {
   "factory-sac": {
     label: "Factory SAC Test",
     node: "https://elastic-sac-platinum.elkaas.flex.com",
-    index: "flexh1smtmachinesdata00589-jax_process_optimizations*",
+    index: "flexh1smtmachinesdata00589-*",
     proxyUrl: "/search",
     username: "",
     password: "",

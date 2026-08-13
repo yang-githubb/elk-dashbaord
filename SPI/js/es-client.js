@@ -27,10 +27,21 @@
     return "Basic " + btoa(`${username}:${password}`);
   }
 
+  function boardSearchUrl() {
+    if (cfg().proxyUrl) {
+      return `${window.location.origin}/search-board`;
+    }
+
+    const { node, boardIndex } = cfg();
+
+    return `${node.replace(/\/$/, "")}/${boardIndex}/_search`;
+  }
+
   D.esClient = {
     searchUrl,
     usesProxy,
     proxyBaseUrl,
+    boardSearchUrl,
 
     async search(body, signal) {
       const controller = new AbortController();
@@ -70,6 +81,66 @@
       } finally {
         clearTimeout(timeout);
         signal?.removeEventListener("abort", onAbort);
+      }
+    },
+    async searchBoard(body, signal) {
+      const controller = new AbortController();
+      const timeout = setTimeout(
+        () => controller.abort(),
+        cfg().fetchTimeoutMs
+      );
+
+      const onAbort = () => controller.abort();
+      signal?.addEventListener("abort", onAbort);
+
+      try {
+        const headers = {
+          "Content-Type": "application/json"
+        };
+
+        if (!usesProxy()) {
+          headers.Authorization = authHeader();
+        }
+
+        const payload = JSON.stringify(body);
+
+        console.log(
+          "Board ES request body",
+          JSON.stringify(body, null, 2)
+        );
+
+        const res = await fetch(
+          boardSearchUrl(),
+          {
+            method: "POST",
+            headers,
+            body: payload,
+            signal: controller.signal
+          }
+        );
+
+        const text = await res.text();
+
+        if (!res.ok) {
+          console.error(
+            "Board HTTP Error:",
+            res.status,
+            text
+          );
+
+          throw new Error(
+            `HTTP ${res.status} ${res.statusText}`
+          );
+        }
+
+        return JSON.parse(text);
+
+      } finally {
+        clearTimeout(timeout);
+        signal?.removeEventListener(
+          "abort",
+          onAbort
+        );
       }
     },
   };

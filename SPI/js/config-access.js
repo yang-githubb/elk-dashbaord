@@ -19,7 +19,7 @@
   D.getTimeLabels = () => cfg().timeLabels || {};
   D.getTimeOrder = () => cfg().timeOrder || [];
   D.getEsTimeRanges = () => cfg().esTimeRanges || {};
-
+  D.getBoardFields = () => cfg().boardFields || {};
   D.esField = (field) => {
     if (typeof field !== "string" || !field) {
       return "";

@@ -17,9 +17,10 @@ window.DASHBOARD_SETTINGS = {
     "24h": "Last 24 hours",
     "7d": "Last 7 days",
     "14d": "Last 14 days",
+    "28d": "Last 28 days",
   },
 
-  timeOrder: ["15m", "1h", "6h", "24h", "7d", "14d"],
+  timeOrder: ["15m", "1h", "6h", "24h", "7d", "14d", "28d"],
 
   esTimeRanges: {
     "15m": "now-15m",
@@ -28,6 +29,7 @@ window.DASHBOARD_SETTINGS = {
     "24h": "now-24h",
     "7d": "now-7d",
     "14d": "now-14d",
+    "28d": "now-28d",
   },
 
   resultColors: {

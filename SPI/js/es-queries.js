@@ -4,6 +4,48 @@
         isAllTime() {
             return D.state.time === "all";
         },
+        buildBoardFilters() {
+            const fields = D.getBoardFields();
+            const filters = [];
+            const timeRanges = D.config.esTimeRanges || {};
+
+            if (!this.isAllTime()) {
+                filters.push({
+                    range: {
+                        [fields.time]: {
+                            gte: timeRanges[D.state.time]
+                        }
+                    }
+                });
+            }
+
+            const lineField = D.esField(fields.line);
+            if (D.state.line && lineField) {
+                filters.push({
+                    term: {
+                        [lineField]: D.state.line
+                    }
+                });
+            }
+
+            const modelField = D.esField(fields.model);
+            if (D.state.model && modelField) {
+                filters.push({
+                    term: {
+                        [modelField]: D.state.model
+                    }
+                });
+            }
+
+            if (D.config.stationValue) {
+                filters.push({
+                    term: {
+                        "station": D.config.stationValue
+                    }
+                });
+            }
+            return filters;
+        },
 
         buildEsFilters() {
             const fields = D.getFields();
@@ -39,7 +81,8 @@
                     }
                 });
             }
-
+            console.log("FIELDS", fields);
+            console.log("FILTERS", filters);
             const kpi = D.getKpi();
             if (kpi.requireSerialField) {
                 filters.push({ exists: { field: kpi.requireSerialField } });
@@ -50,6 +93,7 @@
             if (kpi.excludeLeadingUnderscoreSource) {
                 filters.push({ bool: { must_not: [{ prefix: { "source_file.keyword": "_" } }] } });
             }
+
             return filters;
         },
 
@@ -88,10 +132,7 @@
 
             const kpi = D.getKpi();
 
-            const rf =
-                kpi.componentResultField ||
-                kpi.resultField ||
-                "pcb_result.keyword";
+            const rf = this.boardResultField();
 
             return {
 
@@ -108,28 +149,28 @@
                 count_good: {
                     filter: this.buildTermsFilter(
                         rf,
-                        kpi.good || ["GOOD"]
+                        kpi.boardGood || ["GOOD"]
                     )
                 },
 
                 count_pass: {
                     filter: this.buildTermsFilter(
                         rf,
-                        kpi.pass || ["PASS", "WARNING"]
+                        kpi.boardPass || ["PASS", "WARNING"]
                     )
                 },
 
                 count_fail: {
                     filter: this.buildTermsFilter(
                         rf,
-                        kpi.fail || ["NG"]
+                        kpi.boardFail || ["NG"]
                     )
                 },
 
                 pad_failure_types: {
                     filter: this.buildTermsFilter(
                         rf,
-                        kpi.fail || ["NG"]
+                        kpi.boardFail || ["NG"]
                     ),
                     aggs: {
                         types: {
@@ -178,7 +219,7 @@
         },
         buildBoardAnalysisAggs() {
 
-            const fields = D.getFields();
+            const fields = D.getBoardFields();
             const lineField = D.esField(fields.line);
             const modelField = D.esField(fields.model);
             const boardResultField = this.boardResultField();
@@ -199,7 +240,7 @@
                                 },
                                 aggs: {
                                     inspections: {
-                                        cardinality: {
+                                        value_count: {
                                             field: "source_file.keyword"
                                         }
                                     }
@@ -223,7 +264,7 @@
                                 },
                                 aggs: {
                                     inspections: {
-                                        cardinality: {
+                                        value_count: {
                                             field: "source_file.keyword"
                                         }
                                     }
@@ -258,79 +299,82 @@
         },
 
         buildBoardListAgg(afterKey = null) {
-            const fields = D.getFields();
+            const boardFields = D.getBoardFields();
             const kpi = D.getKpi();
-            const failField = this.boardFailField();
-            const failValues = this.boardFailValues();
             const boardResultField = String(this.boardResultField() || "pcb_result.keyword");
-            const boardGroupField = String(kpi.serialField || "source_file.keyword").trim() || "source_file.keyword";
-            const countField = kpi.boardCountField || "pad_no";
-            const countAgg =
-                kpi.boardCountAgg === "cardinality"
-                    ? { cardinality: { field: D.esField(countField) } }
-                    : { value_count: { field: countField } };
-
+            const boardGroupField =
+                String(
+                    kpi.boardSerialField ||
+                    kpi.serialField ||
+                    "source_file.keyword"
+                ).trim();
             const boardResultSource = boardResultField.replace(/\.keyword$/, "");
             const requiredFields = [
-                fields.line,
-                fields.model,
-                fields.serial,
-                fields.time,
+                boardFields.line,
+                boardFields.model,
+                boardFields.serial,
+                boardFields.time,
                 boardResultSource,
             ];
-            if (fields.machine) {
-                requiredFields.push(fields.machine);
+            if (boardFields.machine) {
+                requiredFields.push(boardFields.machine);
             }
             const boardAggs = {
                 latest_doc: {
                     top_hits: {
                         size: 1,
-                        sort: [{ [fields.time]: { order: "desc", unmapped_type: "date" } }],
+                        sort: [{ [boardFields.time]: { order: "desc", unmapped_type: "date" } }],
                         _source: requiredFields.filter(Boolean),
-                    },
-                },
-                pad_count: countAgg,
-                has_pad_fail: {
-                    filter: this.buildTermsFilter(
-                        "pad_result.keyword",
-                        kpi.padFailResults
-                    )
+                    }
                 }
             };
+            console.log(
+                "BOARD FILTERS",
+                this.buildBoardFilters()
+            );
 
-            // const serialSources = D.getKpi().serialSourceFields || [fields.serial, "barcode", "source_file"];
-            // boardAggs.top_serial = {
-            //   top_hits: {
-            //     size: 1,
-            //     sort: [{ [fields.time]: { order: "desc" } }],
-            //     _source: { includes: serialSources },
-            //   },
-            // };
+            console.log(
+                "BOARD FIELDS",
+                boardFields
+            );
 
             const agg = {
                 size: 0,
-                query: this.buildEsQuery(this.buildEsFilters()),
+                query: this.buildEsQuery(
+                    this.buildBoardFilters()
+                ),
                 aggs: {
                     boards: {
                         composite: {
                             size: D.config.pageSize,
-                            sources: [{ board: { terms: { field: boardGroupField } } }],
+                            sources: [
+                                {
+                                    board: {
+                                        terms: {
+                                            field: boardGroupField
+                                        }
+                                    }
+                                }
+                            ]
                         },
-                        aggs: boardAggs,
-                    },
-                },
+                        aggs: boardAggs
+                    }
+                }
             };
-            if (afterKey) agg.aggs.boards.composite.after = afterKey;
+
+            if (afterKey) {
+                agg.aggs.boards.composite.after = afterKey;
+            }
+
             return agg;
         },
-
         buildBoardListExportAgg(afterKey = null) {
             // Optimized query for export and fast board display - uses top_hits to get latest document per board
             // This is much faster than computing multiple sub-aggregations
-            const fields = D.getFields();
+            const fields = D.getBoardFields();
             const kpi = D.getKpi();
             const serialField = kpi.serialField || "source_file.keyword";
-            
+
             // Only request the fields we need for export to reduce data transfer
             const requiredFields = [
                 fields.serial,
@@ -343,7 +387,7 @@
 
             const agg = {
                 size: 0,
-                query: this.buildEsQuery(this.buildEsFilters()),
+                query: this.buildEsQuery(this.buildBoardFilters()),
                 aggs: {
                     boards: {
                         terms: {

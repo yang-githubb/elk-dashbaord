@@ -285,6 +285,8 @@ ${buildPieSvg(
     renderDataTable(theadId, tbodyId, columns, rows, options = {}) {
       const thead = $(theadId);
       const tbody = $(tbodyId);
+      console.log("thead", thead);
+      console.log("tbody", tbody);
       if (!thead || !tbody) {
         return;
       }
@@ -345,13 +347,19 @@ ${buildPieSvg(
     },
 
     renderBoardTable(rows, onSerialClick, clickable = true) {
+      console.log("rows", rows);
       const validRows = rows.filter((row) => row.serial && row.serial !== "—");
+      console.log("rows count", rows.length);
+      console.log("valid rows count", validRows.length);
+      console.log("first valid row", validRows[0]);
       this.renderDataTable("board-thead", "board-tbody", D.getBoardColumns(), validRows, {
         emptyText: "No boards match the current filters.",
         clickable,
         onSerialClick: clickable ? onSerialClick : undefined,
         onRowClick: clickable ? (row) => onSerialClick(row.serial) : undefined,
       });
+      console.log("renderBoardTable called");
+      console.log("validRows", validRows.length);
     },
 
     renderPadTable(rows) {
@@ -607,6 +615,7 @@ ${buildPieSvg(
         }
       }
 
+
       // Display only good and fail on the board overview card.
       boardGood += boardPass;
       boardPass = 0;
@@ -643,29 +652,30 @@ ${buildPieSvg(
             yieldValue: boardYield,
             yieldColor: boardYieldColor,
 
-          goodCount: boardGood,
-          passCount: 0,
-          failCount: boardFail,
+            goodCount: boardGood,
+            passCount: 0,
+            failCount: boardFail,
 
-          stats: [
-            {
-              label: "Total",
-              value: boardCount
-            },
-            {
-              label: "Good",
-              value: boardGood
-            },
-            {
-              label: "Fail",
-              value: boardFail
-            },
-            {
-              label: "Yield",
-              value: `${boardYield.toFixed(2)}%`
-            }
-          ]
-        });
+            stats: [
+              {
+                label: "Total",
+                value: boardCount
+              },
+              {
+                label: "Good",
+                value: boardGood
+              },
+              {
+                label: "Fail",
+                value: boardFail
+              },
+              {
+                label: "Yield",
+                value: `${boardYield.toFixed(2)}%`
+              }
+            ]
+          }); console.log("KPI AGGS", aggRes.aggregations);
+
       }
 
       const padTotalLabel =
@@ -763,7 +773,9 @@ ${buildPieSvg(
         bucket.latest_doc?.hits?.hits?.[0]?._source || {};
 
       const serialFields =
-        D.getKpi().serialSourceFields || [];
+        D.getKpi().boardSerialSourceFields ||
+        D.getKpi().serialSourceFields ||
+        [];
 
       for (const field of serialFields) {
         if (topHit[field] != null && String(topHit[field]).trim()) {
@@ -771,15 +783,26 @@ ${buildPieSvg(
         }
       }
 
-      if (bucket.key != null) {
-        return formatSerial(bucket.key);
+      if (bucket.key?.board != null) {
+        return formatSerial(bucket.key.board);
       }
+
+
+      console.log(
+        "serialSourceFields",
+        D.getKpi().serialSourceFields
+      );
+
+      console.log(
+        "topHit",
+        topHit
+      );
 
       return "—";
     },
 
     boardBucketToRow(bucket) {
-
+      const boardFields = D.getBoardFields();
       const topHit =
         bucket.latest_doc?.hits?.hits?.[0]?._source || {};
 
@@ -788,7 +811,7 @@ ${buildPieSvg(
         "pcb_result";
 
       const latest =
-        topHit[D.getFields().time] ??
+        topHit[boardFields.time] ??
         topHit.timestamp;
 
       const topResult =
@@ -796,7 +819,7 @@ ${buildPieSvg(
         topHit.pcb_result;
 
       const machine =
-        topHit[D.getFields().machine] ??
+        topHit[boardFields.machine] ??
         topHit.machine ??
         null;
 
@@ -816,17 +839,24 @@ ${buildPieSvg(
       } else {
         result = "PASS";
       }
+      console.log("BOARD ROW", {
+        serial: D.transform.resolveBoardSerial(bucket),
+        model: topHit[boardFields.model],
+        line: topHit[boardFields.line],
+        timestamp: latest,
+        result
+      });
 
       return {
         serial:
           D.transform.resolveBoardSerial(bucket),
 
         model:
-          topHit[D.getFields().model] ??
+          topHit[boardFields.model] ??
           null,
 
         line:
-          topHit[D.getFields().line] ??
+          topHit[boardFields.line] ??
           null,
 
         machine,

@@ -113,10 +113,10 @@ async function loadAnalysis() {
         console.log("loadAnalysis started");
 
         const query = esQueries.buildEsQuery(
-            esQueries.buildEsFilters()
+            esQueries.buildBoardFilters()
         );
 
-        const res = await esClient.search({
+        const res = await esClient.searchBoard({
             size: 0,
             query,
             aggs: esQueries.buildBoardAnalysisAggs()
@@ -263,7 +263,7 @@ function renderLineTable(rows) {
   `;
 
     tbody.innerHTML = rows
-        .map(row => `
+        .map(row => `508840D
       <tr>
         <td>${row.line}</td>
         <td>${row.good}</td>

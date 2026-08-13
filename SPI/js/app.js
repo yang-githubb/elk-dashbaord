@@ -107,7 +107,6 @@
   }
 
   async function loadBoardList(signal) {
-
     const loadBoardStart = performance.now();
 
     const afterKey =
@@ -119,11 +118,24 @@
 
     const agg = esQueries.buildBoardListAgg(afterKey);
     console.debug("loadBoardList query", agg);
-    const res = await esClient.search(
+    const res = await esClient.searchBoard(
       agg,
       signal
     );
+    console.log(
+      "FULL BOARD RESPONSE",
+      JSON.stringify(res, null, 2)
+    );
 
+    console.log(
+      "BUCKET COUNT",
+      res.aggregations?.boards?.buckets?.length
+    );
+
+    console.log(
+      "FIRST BUCKET",
+      res.aggregations?.boards?.buckets?.[0]
+    );
     console.log(
       "ES board search:",
       (performance.now() - esStart).toFixed(0),
@@ -160,12 +172,6 @@
     );
 
     ui.updateBoardPager();
-
-    console.log(
-      "loadBoardList:",
-      (performance.now() - loadBoardStart).toFixed(0),
-      "ms"
-    );
   }
 
   async function loadPads(page, signal) {
@@ -260,10 +266,10 @@
     try {
 
       const query = esQueries.buildEsQuery(
-        esQueries.buildEsFilters()
+        esQueries.buildBoardFilters()
       );
 
-      const aggPromise = esClient.search(
+      const aggPromise = esClient.searchBoard(
         {
           size: 0,
           query,
@@ -353,10 +359,10 @@
     try {
 
       const query = esQueries.buildEsQuery(
-        esQueries.buildEsFilters()
+        esQueries.buildBoardFilters()
       );
 
-      const res = await esClient.search({
+      const res = await esClient.searchBoard({
         size: 0,
         query,
         aggs: esQueries.buildBoardAnalysisAggs()
@@ -580,8 +586,18 @@
             `[Export] Fetching page ${pageCount}...`
           );
 
-          const res = await esClient.search(
+          const res = await esClient.searchBoard(
             esQueries.buildBoardListAgg(afterKey)
+          );
+          console.log("FULL RESPONSE", res);
+          console.log(
+            "BUCKETS",
+            res.aggregations?.boards?.buckets
+          );
+
+          console.log(
+            "AFTER_KEY",
+            res.aggregations?.boards?.after_key
           );
 
           const buckets =

@@ -15,13 +15,19 @@ window.DASHBOARD_SCHEMAS.SPI = {
 
   // ================= FIELD MAPPING =================
   fields: {
-    time: "inspection_date",
+    time: "spi_inspection_date",
     line: "line",
-    model: "pcb_name",
-    serial: "array_barcode", // ✅ SPI board identity
+    model: "spi_pcb_name",
+    serial: "spi_array_barcode", // ✅ SPI board identity
     station: "station",
   },
-
+  boardFields: {
+    time: "inspection_date",
+    model: "pcb_name",
+    serial: "array_barcode",
+    station: "station",
+    line: "line"
+  },
   // ================= RESULT NORMALIZATION =================
   // Used only for UI coloring / labels
   resultMap: {
@@ -38,7 +44,7 @@ window.DASHBOARD_SCHEMAS.SPI = {
     // PAD LEVEL
     // =====================================================
 
-    componentResultField: "pad_result.keyword",
+    componentResultField: "spi_pad_result.keyword",
 
     good: [
       "GOOD"
@@ -98,9 +104,12 @@ window.DASHBOARD_SCHEMAS.SPI = {
     // BOARD IDENTITY
     // =====================================================
 
-    serialField: "array_barcode",
-
+    serialField: "spi_array_barcode.keyword",
+    boardSerialField: "array_barcode",
     serialSourceFields: [
+      "array_barcode"
+    ],
+    boardSerialSourceFields: [
       "array_barcode"
     ],
 
@@ -119,6 +128,7 @@ window.DASHBOARD_SCHEMAS.SPI = {
     boardCountField: "pad_no"
   },
 
+
   // ================= SORT =================
   detailSort: [
     { inspection_date: { order: "desc" } },
@@ -131,7 +141,7 @@ window.DASHBOARD_SCHEMAS.SPI = {
     { key: "serial", label: "Serial", type: "serial" },
     { key: "model", label: "PCB Name" },
     { key: "line", label: "Line" },
-    { key: "inspection_date", label: "Last Inspection", type: "time" },
+    { key: "timestamp", label: "Last Inspection", type: "time" },
     { key: "pad_count", label: "Pads", type: "number" },
     { key: "result", label: "Result", type: "result" },
   ],
