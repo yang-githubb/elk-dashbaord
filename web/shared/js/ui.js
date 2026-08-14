@@ -428,9 +428,10 @@
         (bucket) => bucket.doc_count ?? 0
       );
 
-      const boardGood = boardCounts.good + boardCounts.pass;
+      const boardGood = boardCounts.good;
+      const boardPass = boardCounts.pass;
       const boardFail = boardCounts.fail;
-      const boardCount = boardGood + boardFail;
+      const boardCount = boardGood + boardPass + boardFail;
       const boardYield = boardCount > 0 ? (boardGood / boardCount) * 100 : 0;
       this._boardCount = boardCount;
 
@@ -438,11 +439,12 @@
       if (boardCard) {
         boardCard.innerHTML = buildOverviewCard({
           goodCount: boardGood,
-          passCount: 0,
+          passCount: boardPass,
           failCount: boardFail,
           stats: [
             { label: "Total", value: boardCount },
             { label: "Good", value: boardGood },
+            { label: "Pass", value: boardPass },
             { label: "Fail", value: boardFail },
             { label: "Yield", value: `${boardYield.toFixed(2)}%` },
           ],
