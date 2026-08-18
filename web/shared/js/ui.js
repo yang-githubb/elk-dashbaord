@@ -67,8 +67,7 @@
     return `
       <div class="overview-pie-wrap">
         <div class="overview-pie" style="background: conic-gradient(
-          #22c55e 0% ${goodPct}%,
-          #f59e0b ${goodPct}% ${goodPct + passPct}%,
+          #22c55e ${goodPct}% ${goodPct + passPct}%,
           #ef4444 ${goodPct + passPct}% 100%
         );"></div>
       </div>`;
@@ -422,6 +421,61 @@
     },
 
     applyBoardKpis(boardAggRes) {
+      console.log(
+        "schema=",
+        D.config.schemaKey
+      );
+      if (D.config.schemaKey === "MAGICRAY") {
+
+        const boards =
+          boardAggRes.aggregations?.boards?.buckets || [];
+
+        let pass = 0;
+        let fail = 0;
+
+        for (const board of boards) {
+
+          const result =
+            board.result?.buckets?.[0]?.key;
+
+          if (result === "P" || result === "PASS")
+            pass++;
+
+          else if (result === "F" || result === "FAIL")
+            fail++;
+        }
+
+        const total = pass + fail;
+        const yieldPct =
+          total > 0 ? (pass / total) * 100 : 0;
+
+        this._boardCount = total;
+
+        const boardCard = $("board-overview-content");
+
+        if (boardCard) {
+          boardCard.innerHTML = buildOverviewCard({
+            goodCount: 0,
+            passCount: pass,
+            failCount: fail,
+            stats: [
+              { label: "Total", value: total },
+              { label: "Pass", value: pass },
+              { label: "Fail", value: fail },
+              { label: "Yield", value: `${yieldPct.toFixed(2)}%` },
+            ],
+          });
+        }
+
+        this.updateModeLabel(
+          this._padTotal || 0,
+          total
+        );
+
+        this.setText("updated", `Updated ${formatTime(new Date())}`);
+
+        return;
+      }
       const boardAggs = boardAggRes.aggregations ?? {};
       const boardCounts = D.countNormalizedResults(
         boardAggs.board_results?.buckets || [],
@@ -432,7 +486,10 @@
       const boardPass = boardCounts.pass;
       const boardFail = boardCounts.fail;
       const boardCount = boardGood + boardPass + boardFail;
-      const boardYield = boardCount > 0 ? (boardGood / boardCount) * 100 : 0;
+      const boardYield =
+        boardCount > 0
+          ? ((boardGood + boardPass) / boardCount) * 100
+          : 0;
       this._boardCount = boardCount;
 
       const boardCard = $("board-overview-content");
@@ -457,13 +514,13 @@
         boardOverview.classList.toggle("overview-card-clickable", canOpen);
         boardOverview.onclick = canOpen
           ? () => {
-              const query = new URLSearchParams({
-                time: D.state.time,
-                line: D.state.line,
-                model: D.state.model,
-              });
-              window.location.href = `${D.pageUrl("analysis")}?${query.toString()}`;
-            }
+            const query = new URLSearchParams({
+              time: D.state.time,
+              line: D.state.line,
+              model: D.state.model,
+            });
+            window.location.href = `${D.pageUrl("analysis")}?${query.toString()}`;
+          }
           : null;
       }
 
@@ -494,6 +551,66 @@
     },
 
     applyPadKpis(padAggRes) {
+      console.log(
+        "schema=",
+        D.config.schemaKey
+      );
+      if (D.config.schemaKey === "MAGICRAY") {
+
+        const buckets =
+          padAggRes.aggregations?.pad_results?.buckets || [];
+
+        let pass = 0;
+        let fail = 0;
+
+        const padFailureCounts = {};
+
+        for (const bucket of buckets) {
+
+          const key = String(bucket.key);
+          const count = bucket.doc_count || 0;
+
+          if (key === "OK") {
+            pass += count;
+          } else {
+            fail += count;
+            padFailureCounts[key] = count;
+          }
+        }
+
+        const total = pass + fail;
+        const yieldPct =
+          total > 0 ? (pass / total) * 100 : 0;
+
+        this._padTotal = total;
+
+        const padCard = $("pad-overview-content");
+
+        if (padCard) {
+          padCard.innerHTML = buildOverviewCard({
+            goodCount: 0,
+            passCount: pass,
+            failCount: fail,
+            stats: [
+              { label: "Total Components", value: total },
+              { label: "Pass", value: pass },
+              { label: "Fail", value: fail },
+              { label: "Yield", value: `${yieldPct.toFixed(2)}%` },
+            ],
+          });
+        }
+
+        this.updateModeLabel(
+          total,
+          this._boardCount || 0
+        );
+
+        this.updateParetoChart(padFailureCounts);
+
+        this.setText("updated", `Updated ${formatTime(new Date())}`);
+
+        return;
+      }
       const buckets = padAggRes.aggregations?.pad_results?.buckets || [];
       const counts = D.countNormalizedResults(
         buckets,
@@ -522,7 +639,7 @@
           failCount: counts.fail,
           stats: [
             { label: D.getLabel("padTotal", "Total"), value: padTotal },
-            { label: "Good", value: counts.good },
+            { label: "Pass", value: counts.pass },
             { label: "Fail", value: counts.fail },
             { label: "Yield", value: `${padYield.toFixed(2)}%` },
           ],
@@ -535,14 +652,14 @@
         padOverview.classList.toggle("overview-card-clickable", canOpen);
         padOverview.onclick = canOpen
           ? () => {
-              const query = new URLSearchParams({
-                time: D.state.time,
-                line: D.state.line,
-                model: D.state.model,
-                view: "pad",
-              });
-              window.location.href = `${D.pageUrl("analysis")}?${query.toString()}`;
-            }
+            const query = new URLSearchParams({
+              time: D.state.time,
+              line: D.state.line,
+              model: D.state.model,
+              view: "pad",
+            });
+            window.location.href = `${D.pageUrl("analysis")}?${query.toString()}`;
+          }
           : null;
       }
 

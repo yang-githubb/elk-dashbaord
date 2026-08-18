@@ -34,7 +34,8 @@
         kpi.componentResultField ||
         kpi.padResultField ||
         "spi_pad_result.keyword";
-      return field.includes(".") ? field : `${field}.keyword`;
+
+      return D.esField(field);
     },
 
     padFailValues() {
@@ -149,6 +150,29 @@
     // ---- Dashboard aggregations ----------------------------------------
 
     buildBoardDashboardAggs() {
+      if (D.config.schemaKey === "MAGICRAY") {
+
+        const serialField =
+          D.getKpi().serialField || "source_file";
+
+        return {
+          boards: {
+            terms: {
+              field: serialField,
+              size: 50000
+            },
+            aggs: {
+              result: {
+                terms: {
+                  field: this.boardResultField(),
+                  size: 5
+                }
+              }
+            }
+          }
+        };
+      }
+
       return {
         board_results: {
           terms: {
@@ -206,23 +230,23 @@
       return {
         lines: lineField
           ? {
-              terms: {
-                field: lineField,
-                size: LINE_TERMS_SIZE,
-                execution_hint: "map",
-              },
-              aggs: breakdown,
-            }
+            terms: {
+              field: lineField,
+              size: LINE_TERMS_SIZE,
+              execution_hint: "map",
+            },
+            aggs: breakdown,
+          }
           : emptyTermsAgg(),
         models: modelField
           ? {
-              terms: {
-                field: modelField,
-                size: MODEL_TERMS_SIZE,
-                order: { _count: "desc" },
-              },
-              aggs: breakdown,
-            }
+            terms: {
+              field: modelField,
+              size: MODEL_TERMS_SIZE,
+              order: { _count: "desc" },
+            },
+            aggs: breakdown,
+          }
           : emptyTermsAgg(),
       };
     },
@@ -236,23 +260,23 @@
       return {
         lines: lineField
           ? {
-              terms: {
-                field: lineField,
-                size: LINE_TERMS_SIZE,
-                execution_hint: "map",
-              },
-              aggs: breakdown,
-            }
+            terms: {
+              field: lineField,
+              size: LINE_TERMS_SIZE,
+              execution_hint: "map",
+            },
+            aggs: breakdown,
+          }
           : emptyTermsAgg(),
         models: modelField
           ? {
-              terms: {
-                field: modelField,
-                size: MODEL_TERMS_SIZE,
-                order: { _count: "desc" },
-              },
-              aggs: breakdown,
-            }
+            terms: {
+              field: modelField,
+              size: MODEL_TERMS_SIZE,
+              order: { _count: "desc" },
+            },
+            aggs: breakdown,
+          }
           : emptyTermsAgg(),
       };
     },

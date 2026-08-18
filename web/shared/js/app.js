@@ -7,6 +7,7 @@
  *
  * Single-index dashboards (MagicRay): both KPIs use /search.
  */
+console.log("APP JS UPDATED");
 (function (D) {
   const { ui, esClient, esQueries, transform } = D;
 
@@ -36,6 +37,11 @@
   applySchemaLabels();
 
   // ---- Helpers ---------------------------------------------------------
+  function detailSearch(body, signal) {
+    return D.config.schemaKey === "MAGICRAY"
+      ? esClient.searchMagicRay(body, signal)
+      : esClient.search(body, signal);
+  }
 
   function applySchemaLabels() {
     const hint = document.querySelector("#board-panel .panel-hint");
@@ -117,7 +123,10 @@
       ? D.esBoardField(fields.model)
       : D.esField(fields.model);
 
-    const searchFn = dual ? esClient.searchBoard : esClient.search;
+    const searchFn = dual
+      ? esClient.searchBoard
+      : detailSearch;
+
     const res = await searchFn({
       size: 0,
       track_total_hits: false,
@@ -165,7 +174,7 @@
   }
 
   async function loadPadKpis(signal) {
-    return esClient.search(
+    return detailSearch(
       kpiSearchBody(
         esQueries.buildEsQuery(esQueries.buildEsFilters({ skipSerialSearch: true, lite: true })),
         esQueries.buildPadDashboardAggs()
@@ -213,7 +222,7 @@
       }
     }
 
-    const res = await esClient.search(
+    const res = await detailSearch(
       {
         from: page * D.config.pageSize,
         size: D.config.pageSize,
@@ -264,7 +273,7 @@
         const padKpiPromise = loadPadKpis(controller.signal);
         const boardAggRes = await loadBoardKpis(controller.signal);
         if (controller.signal.aborted) return;
-
+        
         ui.applyBoardKpis(boardAggRes);
         if (!silent) ui.setPadKpisLoading();
 
@@ -287,7 +296,7 @@
           }
         }
       } else {
-        const res = await esClient.search(
+        const res = await detailSearch(
           kpiSearchBody(
             esQueries.buildEsQuery(esQueries.buildEsFilters({ skipSerialSearch: true, lite: true })),
             {
@@ -298,7 +307,7 @@
           controller.signal
         );
         if (controller.signal.aborted) return;
-
+        console.log("SCHEMA KEY =", D.config.schemaKey);
         ui.applyBoardKpis(res);
         ui.applyPadKpis(res);
 
@@ -373,7 +382,7 @@
       return;
     }
 
-    const res = await esClient.search({
+    const res = await detailSearch({
       size: PAD_EXPORT_SIZE,
       sort: [{ [esQueries.padNoField()]: { order: "asc" } }],
       query: esQueries.buildEsQuery(esQueries.buildPadFilters(serial)),

@@ -22,5 +22,5 @@ window.DASHBOARD_REGISTRY = [
     description: "FQI autotest — component results and failure Pareto.",
     path: "/dashboards/magicray/index.html",
     station: "FQI",
-  },
+  }
 ];

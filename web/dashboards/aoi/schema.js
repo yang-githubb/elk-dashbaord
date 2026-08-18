@@ -62,7 +62,7 @@ window.DASHBOARD_SCHEMAS.MAGICRAY = {
   kpi: {
     componentResultField: "confirmedresult",
 
-    good: [],
+    good: ["OK"],
     pass: ["NONE", "WrongOrientation"],
     fail: [
       "Short",

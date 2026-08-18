@@ -32,6 +32,11 @@
 
   D.esField = (field) => {
     if (typeof field !== "string" || !field) return "";
+
+    if (cfg().indexMode === "single") {
+      return field;
+    }
+
     return field.includes(".") ? field : `${field}.keyword`;
   };
 

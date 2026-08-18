@@ -44,7 +44,14 @@ DETAIL_INDEX = os.environ.get(
     "DETAIL_INDEX", "flexh1smtmachinesdata00589-jax_process_optimizations*"
 )
 
-BOARD_INDEX = os.environ.get("BOARD_INDEX", "flexh1smtmachinesdata00589-spi-board")
+BOARD_INDEX = os.environ.get("BOARD_INDEX", "flexh1smtmachinesdata00589-spi-board*")
+
+MR_INDEX = os.environ.get(
+    "MR_INDEX",
+    "flexh1smtmachinesdata00589-magicray*"
+)
+
+MR_SEARCH_URL = f"{ES_URL}/{MR_INDEX}/_search"
 
 DETAIL_SEARCH_URL = f"{ES_URL}/{DETAIL_INDEX}/_search"
 
@@ -198,6 +205,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif path in ("/search-board", "/search-board/"):
             target_url = BOARD_SEARCH_URL
+        
+        elif path in ("/search-mr", "/search-mr/"):
+            target_url = MR_SEARCH_URL
 
         else:
             self.send_error(404, "Use POST /search or /search-board")

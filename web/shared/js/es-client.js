@@ -36,6 +36,9 @@
     const { node, boardIndex } = cfg();
     return `${node.replace(/\/$/, "")}/${boardIndex}/_search`;
   }
+  function magicRaySearchUrl() {
+    return `${window.location.origin}/search-mr`;
+  }
 
   function authHeader() {
     const { username, password } = cfg();
@@ -60,6 +63,9 @@
   }
 
   async function postSearch(url, body, signal) {
+    console.log("ES URL:", url);
+    console.log("ES BODY:", JSON.stringify(body, null, 2));
+
     const controller = new AbortController();
     const timeoutMs = Number(cfg().fetchTimeoutMs) || 0;
     const timeout =
@@ -83,6 +89,19 @@
       });
 
       const text = await res.text();
+      const parsed = JSON.parse(text);
+
+      console.log(
+        "TOTAL:",
+        parsed.hits?.total
+      );
+
+      console.log(
+        "AGGS:",
+        JSON.stringify(parsed.aggregations, null, 2)
+      );
+
+      return parsed;
       if (!res.ok) {
         throw new Error(formatSearchError(res.status, res.statusText, text));
       }
@@ -100,5 +119,7 @@
     boardSearchUrl,
     search: (body, signal) => postSearch(searchUrl(), body, signal),
     searchBoard: (body, signal) => postSearch(boardSearchUrl(), body, signal),
+    searchMagicRay: (body, signal) =>
+      postSearch(magicRaySearchUrl(), body, signal),
   };
 })(window.Dashboard);
